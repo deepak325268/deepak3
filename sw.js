@@ -4,7 +4,7 @@
 
 // 1) MANUAL VERSION — jab bhi khud se force-update chahiye,
 //    bas ye number badha dena (1 -> 2 -> 3...)
-var MANUAL_VERSION = 1;
+var MANUAL_VERSION = 2;
 
 // 2) AUTO VERSION — mahina badalte hi khud-ba-khud badal jata hai
 var now = new Date();
