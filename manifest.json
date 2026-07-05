@@ -1,0 +1,21 @@
+{
+  "name": "S & D",
+  "short_name": "S & D",
+  "start_url": "/deepak3/",
+  "scope": "/deepak3/",
+  "display": "standalone",
+  "background_color": "#f5f5f0",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/deepak3/logo2.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/deepak3/logo2.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

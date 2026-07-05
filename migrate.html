@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<title>Migrate to Firebase — one-time tool</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:640px;margin:40px auto;padding:0 16px;background:#111;color:#eee}
+  h1{font-size:20px}
+  p{color:#aaa;font-size:14px;line-height:1.5}
+  input{width:100%;padding:10px;margin:8px 0;background:#222;color:#eee;border:1px solid #444;border-radius:6px;box-sizing:border-box}
+  button{padding:10px 18px;background:#2d8a4e;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #log{margin-top:16px;font-family:monospace;font-size:13px;white-space:pre-wrap;background:#000;padding:12px;border-radius:6px;max-height:420px;overflow:auto}
+  .ok{color:#6f6}
+  .err{color:#f66}
+</style>
+</head>
+<body>
+<h1>⚠️ One-time Migration Tool</h1>
+<p>
+  Purane GitHub repo (<code>deepak2</code>) ke sabhi question files ko
+  naye Firebase-based system (<code>deepak3</code>) me copy karta hai.
+  Ek baar successfully chal jaaye to ye file delete kar dena — dobara
+  chalane ki zaroorat nahi hai (dobara chalaoge to bhi kuch nahi bigdega,
+  bas overwrite ho jaayega).
+</p>
+
+<input type="password" id="pw" placeholder="Admin password">
+<button id="run-btn" onclick="runMigration()">🚀 Migration Start Karo</button>
+
+<div id="log"></div>
+
+<script>
+// 👇 admin.html me jo WORKER_URL daala hai, wahi yahan bhi daalo
+const WORKER_URL = "https://deepak3-admin-proxy.ctetone31.workers.dev";
+const OLD_BASE   = "https://deepak325268.github.io/deepak2/questions/";
+
+// Jo files migrate karni hain (meta.json screenshot ke hisaab se)
+const FILES = [
+  "average.json",
+  "clock.json",
+  "compound-interest.json",
+  "hcf-lcm.json",
+  "statistics.json",
+  "simple-interest.json",
+  "profit-and-loss.json",
+  "meta.json",
+  "important-questions.json"
+];
+
+function log(msg, cls) {
+  const el = document.getElementById('log');
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+async function runMigration() {
+  const pw = document.getElementById('pw').value;
+  if (!pw) { log('Password daalo!', 'err'); return; }
+  document.getElementById('run-btn').disabled = true;
+
+  log('Login ho raha hai...');
+  let token;
+  try {
+    const loginRes = await fetch(`${WORKER_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    if (!loginRes.ok) { log('❌ Login fail — password galat hai ya Worker URL galat hai', 'err'); document.getElementById('run-btn').disabled = false; return; }
+    token = (await loginRes.json()).token;
+  } catch (e) {
+    log('❌ Worker se connect nahi ho paaya: ' + e.message, 'err');
+    document.getElementById('run-btn').disabled = false;
+    return;
+  }
+  log('✅ Login ho gaya. Migration shuru...', 'ok');
+
+  for (const file of FILES) {
+    try {
+      log(`⏳ ${file} — purane repo se fetch kar raha hu...`);
+      const oldRes = await fetch(OLD_BASE + file + '?t=' + Date.now());
+      if (!oldRes.ok) { log(`⚠️ ${file} — purane repo me mila nahi, skip kar raha hu`, 'err'); continue; }
+      const data = await oldRes.json();
+
+      const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+      const putRes = await fetch(`${WORKER_URL}/proxy/contents/questions/${file}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ message: `Migrate ${file}`, content, branch: 'main' })
+      });
+      if (putRes.ok) {
+        const count = Array.isArray(data) ? data.length + ' items' : 'object';
+        log(`✅ ${file} — Firebase me save ho gaya (${count})`, 'ok');
+      } else {
+        const err = await putRes.json().catch(() => ({}));
+        log(`❌ ${file} — save fail: ${err.message || 'unknown error'}`, 'err');
+      }
+    } catch (e) {
+      log(`❌ ${file} — error: ${e.message}`, 'err');
+    }
+  }
+
+  log('🎉 Migration complete! Ab index.html aur admin.html Firebase se hi kaam karenge.', 'ok');
+  document.getElementById('run-btn').disabled = false;
+}
+</script>
+</body>
+</html>

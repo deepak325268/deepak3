@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="hi" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<script>
+// Theme flash na ho isliye page paint hone se pehle hi set kar dete hai
+(function(){
+  var t = localStorage.getItem('chapter_order_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+<title>Chapter Order Manager</title>
+<style>
+:root {
+  --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2a2d3a;
+  --accent:#6c63ff; --accent-soft:rgba(108,99,255,.16); --accent2:#ff6584;
+  --text:#e8eaf6; --muted:#7b7f9e;
+  --success:#4caf82; --error:#ff5252; --warn:#ffb347;
+  --r-lg:16px; --r-md:12px; --r-sm:9px;
+  --shadow-drag:0 10px 24px rgba(0,0,0,.4);
+}
+html[data-theme="light"] {
+  --bg:#f4f5fa; --surface:#ffffff; --surface2:#eef0f8; --border:#e0e3ee;
+  --accent:#6c63ff; --accent-soft:rgba(108,99,255,.10); --accent2:#ff6584;
+  --text:#20222e; --muted:#767b93;
+  --success:#2e9d6b; --error:#e0313e; --warn:#c97c12;
+  --shadow-drag:0 10px 24px rgba(20,20,40,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;min-height:100vh;padding-bottom:104px;transition:background .2s,color .2s}
+
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 18px;position:sticky;top:0;z-index:10}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+header h1{font-size:17px;font-weight:700;letter-spacing:.2px}
+header .sub{font-size:12px;color:var(--muted);margin-top:3px}
+
+.theme-toggle{
+  flex-shrink:0;width:38px;height:38px;border-radius:50%;
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.theme-toggle:active{transform:scale(.94)}
+
+.tabs{display:flex;gap:6px;padding:14px 14px 0}
+.tab-btn{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:700;border-radius:var(--r-sm);cursor:pointer;background:var(--surface);border:1px solid var(--border);color:var(--muted);transition:background .15s,color .15s,border-color .15s}
+.tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.status{margin:10px 14px 0;font-size:13px;padding:10px 12px;border-radius:var(--r-sm);display:none}
+.status.show{display:block}
+.status.ok{background:rgba(76,175,130,.12);color:var(--success);border:1px solid rgba(76,175,130,.3)}
+.status.err{background:rgba(255,82,82,.12);color:var(--error);border:1px solid rgba(255,82,82,.3)}
+.status.info{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(108,99,255,.3)}
+
+.panel{display:none;padding:12px 14px 14px}
+.panel.active{display:block}
+
+.hint{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding:2px 2px 12px}
+
+.list{position:relative;display:flex;flex-direction:column}
+
+.ch-card{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:10px 12px;margin-bottom:8px;
+  transition:box-shadow .15s,border-color .15s,background .15s,transform .15s;
+  will-change:transform;
+}
+.ch-card.dragging{
+  background:var(--surface2);border-color:var(--accent);
+  box-shadow:var(--shadow-drag);transform:scale(1.02);
+  opacity:.96;position:relative;z-index:5;
+}
+
+.drag-handle{
+  flex-shrink:0;width:34px;height:34px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--muted);cursor:grab;touch-action:none;
+}
+.drag-handle:active{cursor:grabbing;color:var(--accent);background:var(--accent-soft)}
+.drag-handle svg{pointer-events:none}
+
+.ch-num{
+  flex-shrink:0;width:26px;height:26px;border-radius:50%;
+  background:var(--surface2);color:var(--accent);
+  font-size:11.5px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+}
+.ch-card.dragging .ch-num{background:var(--accent);color:#fff}
+
+.ch-name{flex:1;font-size:14px;font-weight:600;line-height:1.35;user-select:none}
+
+.loading{text-align:center;padding:40px 0;color:var(--muted);font-size:14px}
+.empty{text-align:center;padding:30px 0;color:var(--muted);font-size:13px}
+
+.footer-actions{
+  position:fixed;left:0;right:0;bottom:0;z-index:20;
+  display:flex;gap:10px;
+  padding:12px 14px calc(12px + env(safe-area-inset-bottom));
+  background:var(--surface);border-top:1px solid var(--border);
+}
+.btn{border:none;border-radius:var(--r-sm);font-size:14px;font-weight:700;cursor:pointer;padding:13px;transition:transform .1s,opacity .1s}
+.btn:active{transform:scale(.97)}
+.btn-save{flex:1.6;background:var(--success);color:#fff}
+.btn-reset{flex:1;background:transparent;border:1px solid var(--error);color:var(--error)}
+
+.lock-screen{
+  position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.lock-box{width:100%;max-width:320px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 22px;text-align:center}
+.lock-icon{font-size:34px;margin-bottom:10px}
+.lock-box h2{font-size:16px;margin-bottom:6px}
+.lock-box p{font-size:12.5px;color:var(--muted);margin-bottom:16px;line-height:1.4}
+.lock-box input{width:100%;padding:12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;margin-bottom:10px;text-align:center}
+.lock-box input:focus{outline:none;border-color:var(--accent)}
+.lock-box .btn{width:100%}
+.lock-err{font-size:12px;color:var(--error);margin-top:10px;min-height:14px}
+</style>
+</head>
+<body>
+
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-box">
+    <div class="lock-icon">🔒</div>
+    <h2>Access Key</h2>
+    <p></p>
+    <input type="password" id="lockInput" placeholder="Access key" onkeydown="if(event.key==='Enter') unlockApp()">
+    <button class="btn btn-save" id="lockBtn" onclick="unlockApp()">Unlock</button>
+    <div class="lock-err" id="lockErr"></div>
+  </div>
+</div>
+
+<header>
+  <div class="header-row">
+    <div>
+      <h1>📑 Chapter Order Manager</h1>
+      <div class="sub">set order as you want in app</div>
+    </div>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Theme badlo">🌙</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab-btn active" id="tabMathBtn" onclick="switchPanel('math')">📐 Math</div>
+  <div class="tab-btn" id="tabReasoningBtn" onclick="switchPanel('reasoning')">🧠 Reasoning</div>
+</div>
+
+<div class="status" id="status"></div>
+
+<div class="panel active" id="panelMath">
+  <div class="hint"></div>
+  <div class="list" id="listMath">
+    <div class="loading" id="loadingMath">Load ho raha hai...</div>
+  </div>
+</div>
+<div class="panel" id="panelReasoning">
+  <div class="hint"></div>
+  <div class="list" id="listReasoning">
+    <div class="loading" id="loadingReasoning">Load ho raha hai...</div>
+  </div>
+</div>
+
+<div class="footer-actions">
+  <button class="btn btn-reset" onclick="resetOrder()">↩️ Reset</button>
+  <button class="btn btn-save" onclick="saveOrder()">💾 Save order</button>
+</div>
+
+<script>
+// ⚠️ Deploy karne ke baad Worker ka URL yaha daalo:
+const WORKER_URL = "https://chapter-order-proxy.ctetone31.workers.dev";
+const FIREBASE_URL = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+let activeSubject = 'math';
+let lists = { math: [], reasoning: [] };
+
+// ---------- Theme ----------
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('chapter_order_theme', next);
+  updateThemeIcon(next);
+}
+
+function updateThemeIcon(theme) {
+  document.getElementById('themeToggle').textContent = theme === 'dark' ? '🌙' : '☀️';
+}
+
+// ---------- Access-key lock screen ----------
+// Nayi tab/browser me kholte hi yeh key maangega. Ek baar sahi key de do,
+// wo save ho jaayegi to dubara nahi poochega. Agar Save/Reset karte waqt
+// Worker key ko galat bataye (401), to yeh dubara lock ho jaayega.
+
+function showLock() {
+  document.getElementById('lockInput').value = '';
+  document.getElementById('lockErr').textContent = '';
+  const el = document.getElementById('lockScreen');
+  el.style.display = 'flex';
+  document.getElementById('lockInput').focus();
+}
+
+function hideLock() {
+  document.getElementById('lockScreen').style.display = 'none';
+}
+
+function checkLock() {
+  const key = localStorage.getItem('chapter_order_access_key');
+  if (key) { hideLock(); } else { showLock(); }
+}
+
+async function unlockApp() {
+  const val = document.getElementById('lockInput').value.trim();
+  const errEl = document.getElementById('lockErr');
+  const btn = document.getElementById('lockBtn');
+
+  if (!val) { errEl.textContent = 'Key can not be emptly'; return; }
+
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+
+  try {
+    const res = await fetch(WORKER_URL + '/verify-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessKey: val }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      localStorage.setItem('chapter_order_access_key', val);
+      hideLock();
+    } else {
+      errEl.textContent = '❌ ' + (data.error || 'Wrong access key');
+    }
+  } catch (e) {
+    errEl.textContent = 'Network error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Unlock';
+  }
+}
+
+function switchPanel(subject) {
+  activeSubject = subject;
+  document.getElementById('tabMathBtn').classList.toggle('active', subject === 'math');
+  document.getElementById('tabReasoningBtn').classList.toggle('active', subject === 'reasoning');
+  document.getElementById('panelMath').classList.toggle('active', subject === 'math');
+  document.getElementById('panelReasoning').classList.toggle('active', subject === 'reasoning');
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status show ' + type;
+}
+
+function applyCustomOrder(chapterNames, order) {
+  if (!order || !Array.isArray(order) || order.length === 0) return chapterNames.slice();
+  const remaining = chapterNames.slice();
+  const ordered = [];
+  order.forEach(function(name) {
+    const idx = remaining.indexOf(name);
+    if (idx !== -1) { ordered.push(name); remaining.splice(idx, 1); }
+  });
+  return ordered.concat(remaining); // naye chapters jo order me nahi hain, end me
+}
+
+// ---------- Rendering ----------
+
+function renderList(subject) {
+  const container = document.getElementById(subject === 'math' ? 'listMath' : 'listReasoning');
+  const arr = lists[subject];
+  container.innerHTML = '';
+
+  if (arr.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Koi chapter nahi mila';
+    container.appendChild(empty);
+    return;
+  }
+
+  arr.forEach(function(name, i) {
+    const card = document.createElement('div');
+    card.className = 'ch-card';
+    card.dataset.name = name;
+
+    const handle = document.createElement('div');
+    handle.className = 'drag-handle';
+    handle.setAttribute('aria-label', 'Drag to reorder');
+    handle.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor">' +
+      '<circle cx="6" cy="4" r="1.6"/><circle cx="14" cy="4" r="1.6"/>' +
+      '<circle cx="6" cy="10" r="1.6"/><circle cx="14" cy="10" r="1.6"/>' +
+      '<circle cx="6" cy="16" r="1.6"/><circle cx="14" cy="16" r="1.6"/></svg>';
+
+    const num = document.createElement('div');
+    num.className = 'ch-num';
+    num.textContent = i + 1;
+
+    const label = document.createElement('div');
+    label.className = 'ch-name';
+    label.textContent = name;
+
+    card.appendChild(handle);
+    card.appendChild(num);
+    card.appendChild(label);
+    container.appendChild(card);
+  });
+}
+
+// ---------- Drag & drop reorder (Pointer Events: mouse + touch dono) ----------
+// Smooth banane ke 3 tarike:
+// 1) Dragging card transform se pointer ke saath 1:1 move karta hai (jump nahi)
+// 2) Jagah banane wale baaki cards FLIP technique se slide hote hain
+// 3) pointermove ko requestAnimationFrame pe throttle karte hai (warna har move
+//    event pe getBoundingClientRect chalne se layout thrash + jank hota hai)
+
+function initDragging(subject) {
+  const container = document.getElementById(subject === 'math' ? 'listMath' : 'listReasoning');
+  let draggingEl = null;
+  let pointerId = null;
+  let pointerStartY = 0;
+  let elStartOffsetTop = 0;
+  let pendingY = null;
+  let rafId = null;
+
+  container.addEventListener('pointerdown', function(e) {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const card = handle.closest('.ch-card');
+    if (!card) return;
+
+    e.preventDefault();
+    draggingEl = card;
+    pointerId = e.pointerId;
+    pointerStartY = e.clientY;
+    elStartOffsetTop = card.offsetTop;
+
+    card.classList.add('dragging');
+    card.style.transition = 'none'; // drag ke dauraan koi CSS transition lag na kare
+    card.style.transform = 'translateY(0px) scale(1.02)';
+
+    try { handle.setPointerCapture(pointerId); } catch (err) {}
+    if (navigator.vibrate) navigator.vibrate(8);
+  });
+
+  container.addEventListener('pointermove', function(e) {
+    if (!draggingEl || e.pointerId !== pointerId) return;
+    e.preventDefault();
+    pendingY = e.clientY;
+    if (rafId == null) rafId = requestAnimationFrame(processMove);
+  });
+
+  function processMove() {
+    rafId = null;
+    if (!draggingEl || pendingY == null) return;
+    const clientY = pendingY;
+
+    // Card kahan dikhna chahiye (finger ke saath 1:1)
+    const desiredTop = elStartOffsetTop + (clientY - pointerStartY);
+
+    // Order badalne ki zaroorat hai kya, baaki cards ko smoothly slide karo
+    reorderWithFlip(getDragAfterElement(container, clientY));
+
+    // Naye flow-position ke hisaab se transform recalc karo taaki visual jump na aaye
+    const newOffsetTop = draggingEl.offsetTop;
+    draggingEl.style.transform = 'translateY(' + (desiredTop - newOffsetTop) + 'px) scale(1.02)';
+  }
+
+  function reorderWithFlip(afterEl) {
+    if (afterEl === draggingEl) return;
+    const currentNext = draggingEl.nextElementSibling;
+    if (afterEl == null && currentNext == null) return; // already last
+    if (afterEl === currentNext) return; // no-op
+
+    const siblings = [].slice.call(container.querySelectorAll('.ch-card:not(.dragging)'));
+    const firstRects = siblings.map(function(el) { return [el, el.getBoundingClientRect()]; });
+
+    if (afterEl == null) container.appendChild(draggingEl);
+    else container.insertBefore(draggingEl, afterEl);
+
+    // FLIP: purani position se nayi position tak smoothly slide karo (jump nahi)
+    firstRects.forEach(function(pair) {
+      const el = pair[0], first = pair[1];
+      const last = el.getBoundingClientRect();
+      const dy = first.top - last.top;
+      if (dy) {
+        el.style.transition = 'none';
+        el.style.transform = 'translateY(' + dy + 'px)';
+        el.getBoundingClientRect(); // reflow force karne ke liye
+        requestAnimationFrame(function() {
+          el.style.transition = '';
+          el.style.transform = '';
+        });
+      }
+    });
+  }
+
+  function endDrag(e) {
+    if (!draggingEl || e.pointerId !== pointerId) return;
+    const el = draggingEl;
+    if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+    pendingY = null;
+
+    el.style.transition = ''; // wapas CSS ke .15s transition pe (smooth settle)
+    el.style.transform = '';
+    el.classList.remove('dragging');
+
+    draggingEl = null;
+    pointerId = null;
+    syncOrderFromDOM(subject);
+  }
+
+  container.addEventListener('pointerup', endDrag);
+  container.addEventListener('pointercancel', endDrag);
+}
+
+function getDragAfterElement(container, y) {
+  const els = [].slice.call(container.querySelectorAll('.ch-card:not(.dragging)'));
+  return els.reduce(function(closest, child) {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+}
+
+function syncOrderFromDOM(subject) {
+  const container = document.getElementById(subject === 'math' ? 'listMath' : 'listReasoning');
+  const cards = [].slice.call(container.querySelectorAll('.ch-card'));
+  lists[subject] = cards.map(function(c) { return c.dataset.name; });
+  cards.forEach(function(c, i) {
+    c.querySelector('.ch-num').textContent = i + 1;
+  });
+  showStatus('Order badal gaya — "Order Save Karo" dabana mat bhoolna 👇', 'info');
+}
+
+// ---------- Data load ----------
+
+async function loadAll() {
+  try {
+    const [mainRes, mathOrderRes, reasoningOrderRes] = await Promise.all([
+      fetch(FIREBASE_URL + '/revisionData.json').then(r => r.json()),
+      fetch(FIREBASE_URL + '/chapterOrder/math.json').then(r => r.json()).catch(() => null),
+      fetch(FIREBASE_URL + '/chapterOrder/reasoning.json').then(r => r.json()).catch(() => null),
+    ]);
+
+    const mathNames = (mainRes.chapters || []).map(c => c.chapter);
+    const reasoningNames = (mainRes.reasoning && mainRes.reasoning.chapters || []).map(c => c.chapter);
+
+    lists.math = applyCustomOrder(mathNames, mathOrderRes);
+    lists.reasoning = applyCustomOrder(reasoningNames, reasoningOrderRes);
+
+    renderList('math');
+    renderList('reasoning');
+  } catch (e) {
+    showStatus('Data load nahi hua: ' + e.message, 'err');
+  }
+}
+
+function getAccessKey() {
+  let key = localStorage.getItem('chapter_order_access_key');
+  if (!key) {
+    key = prompt('Access key daalo (Worker me set kiya hua password):');
+    if (key) localStorage.setItem('chapter_order_access_key', key);
+  }
+  return key;
+}
+
+async function saveOrder() {
+  const key = getAccessKey();
+  if (!key) { showStatus('Access key ke bina save nahi hoga', 'err'); return; }
+
+  showStatus('Saving...', 'info');
+  try {
+    const res = await fetch(WORKER_URL + '/save-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessKey: key, subject: activeSubject, order: lists[activeSubject] }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showStatus('✅ ' + (activeSubject === 'math' ? 'Math' : 'Reasoning') + ' order save ho gaya!', 'ok');
+    } else {
+      if (res.status === 401) { localStorage.removeItem('chapter_order_access_key'); showLock(); }
+      showStatus('❌ ' + data.error, 'err');
+    }
+  } catch (e) {
+    showStatus('Network error: ' + e.message, 'err');
+  }
+}
+
+async function resetOrder() {
+  if (!confirm((activeSubject === 'math' ? 'Math' : 'Reasoning') + ' ka order Sheet wale default order pe wapas kar du?')) return;
+  const key = getAccessKey();
+  if (!key) { showStatus('Access key ke bina reset nahi hoga', 'err'); return; }
+
+  showStatus('Resetting...', 'info');
+  try {
+    const res = await fetch(WORKER_URL + '/save-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessKey: key, subject: activeSubject, order: [] }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      showStatus('↩️ Sheet order pe wapas ho gaya. Page reload karo.', 'ok');
+    } else {
+      if (res.status === 401) { localStorage.removeItem('chapter_order_access_key'); showLock(); }
+      showStatus('❌ ' + data.error, 'err');
+    }
+  } catch (e) {
+    showStatus('Network error: ' + e.message, 'err');
+  }
+}
+
+updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'dark');
+checkLock();
+initDragging('math');
+initDragging('reasoning');
+loadAll();
+
+  if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/deepak3/sw.js');
+}
+  
+</script>
+</body>
+</html>
