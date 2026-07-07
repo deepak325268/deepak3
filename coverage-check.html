@@ -3,15 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Revision Coverage Checker</title>
+<title>Revision Data Checker</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0b0b0d;color:#e4e4e7;font-family:system-ui,sans-serif;padding:16px;max-width:760px;margin:0 auto}
+  body{background:#0b0b0d;color:#e4e4e7;font-family:system-ui,sans-serif;padding:16px;max-width:780px;margin:0 auto}
   h1{font-size:19px;margin-bottom:4px}
+  h2{font-size:15px;margin-bottom:10px;color:#f4f4f5}
   p.sub{color:#9ca3af;font-size:13px;margin-bottom:14px;line-height:1.5}
   .status{font-size:13px;color:#a1a1aa;margin-bottom:16px;white-space:pre-line}
   button.main{background:#4f46e5;color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:13px;cursor:pointer;font-weight:600;margin-bottom:16px}
   button.main:hover{background:#4338ca}
+
+  .issues-box{background:#1c1013;border:1px solid #7f1d1d;border-radius:12px;padding:16px;margin-bottom:20px}
+  .issues-box.clean{background:#0f1c14;border-color:#166534}
+  .issue-row{font-size:13px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.06)}
+  .issue-row:last-child{border-bottom:none}
+  .issue-chapter{font-weight:700;color:#fca5a5}
+  .issue-text{color:#e4e4e7}
+
   .chapter{background:#151517;border:1px solid #27272a;border-radius:12px;padding:14px;margin-bottom:10px}
   .chapter-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap}
   .chapter-name{font-weight:700;font-size:15px}
@@ -20,23 +29,20 @@
   .ok{color:#4ade80}
   .missing{color:#f87171}
   .unmatched{color:#facc15}
-  textarea{
-    width:100%;min-height:36px;background:#0b0b0d;color:#71717a;border:1px solid #3f3f46;
-    border-radius:8px;padding:8px 10px;font-family:monospace;font-size:12px;resize:vertical;margin-top:6px;
-  }
 </style>
 </head>
 <body>
 
-<h1>📊 Revision Coverage Checker</h1>
+<h1>📊 Revision Data Checker</h1>
 <p class="sub">
-  Sheet se ranges automatically fetch hoti hain (koi copy-paste nahi). Agar kisi chapter ka naam
-  Firebase ke filename se match nahi hua, wo "unmatched" me dikhega — us case me box me manually
-  ranges daal ke check kar sakte ho.
+  Google Sheet ki poori revision-data ko check karta hai — galat/reversed ranges, chapter ke total
+  se bahar jaati hui ranges, samajh na aane wale cells, aur jo questions kisi bhi din revise nahi ho rahe,
+  sab ek jagah dikhata hai.
 </p>
 
 <button class="main" onclick="runCheck()">🔄 Fetch &amp; Check</button>
 <div class="status" id="status">"Fetch & Check" dabao shuru karne ke liye.</div>
+<div id="issues"></div>
 <div id="chapters"></div>
 
 <script>
@@ -47,12 +53,10 @@ const SHEETS = [
   { name: "Reasoning", gid: "170226942" }
 ];
 
-// index.html jaisa hi slugify — taaki sheet-naam se wahi filename bane
 function slugify(name) {
   return name.toLowerCase().trim().replace(/&/g, 'and').replace(/\s+/g, '-');
 }
 
-// Simple CSV parser jo quoted commas (jaise "Cubes, Cuboids and Dice") handle karta hai
 function parseCSV(text) {
   const rows = [];
   let row = [], field = '', inQuotes = false;
@@ -74,47 +78,53 @@ function parseCSV(text) {
   return rows;
 }
 
-async function fetchSheetRanges(gid) {
+// Sheet parse karke har chapter ki raw cell-list nikalta hai (bina normalize kiye,
+// taaki reversed/invalid ranges pakde ja sakein)
+async function fetchSheetChapters(gid, sheetLabel) {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error("Sheet fetch fail (" + res.status + ")");
+  if (!res.ok) throw new Error(`${sheetLabel} sheet fetch fail (${res.status})`);
   const csv = await res.text();
   const rows = parseCSV(csv);
+  const dayHeaders = rows[1] || [];
 
-  const result = {}; // slug -> {covered:Set, displayName}
+  const chapters = {}; // slug -> {displayName, sheetLabel, cells:[{day, raw}]}
   for (let i = 2; i < rows.length; i++) {
     const chapter = (rows[i][0] || "").toString().trim();
     if (!chapter || chapter.toLowerCase() === "chapter name" || chapter.includes("/")) continue;
 
-    const covered = new Set();
+    const cells = [];
+    let anyContent = false;
     for (let j = 1; j < rows[i].length; j++) {
-      const cell = (rows[i][j] || "").toString().trim();
-      const m = cell.match(/^(\d+)\s*-\s*(\d+)$/);
-      if (m) {
-        const lo = Math.min(+m[1], +m[2]), hi = Math.max(+m[1], +m[2]);
-        for (let n = lo; n <= hi; n++) covered.add(n);
+      const raw = (rows[i][j] || "").toString().trim();
+      if (raw) {
+        anyContent = true;
+        const day = (dayHeaders[j] || "").toString().trim() || ("col" + j);
+        cells.push({ day, raw });
       }
     }
-    if (covered.size === 0) continue; // koi range hi nahi is row me (jaise blank/label row)
+    if (!anyContent) continue; // khaali row (label/spacer), skip
 
     const slug = slugify(chapter);
-    if (!result[slug]) result[slug] = { covered: new Set(), displayName: chapter };
-    covered.forEach(n => result[slug].covered.add(n));
+    if (!chapters[slug]) chapters[slug] = { displayName: chapter, sheetLabel, cells: [] };
+    chapters[slug].cells.push(...cells);
   }
-  return result;
+  return chapters;
 }
 
 async function runCheck() {
   const statusEl = document.getElementById('status');
+  const issuesEl = document.getElementById('issues');
   const container = document.getElementById('chapters');
+  issuesEl.innerHTML = '';
   container.innerHTML = '';
-  statusEl.textContent = "Sheet se ranges fetch ho rahi hain...";
+  statusEl.textContent = "Sheet se data fetch ho raha hai...";
 
-  let sheetRanges = {};
+  let sheetChapters = {};
   try {
     for (const s of SHEETS) {
-      const r = await fetchSheetRanges(s.gid);
-      Object.assign(sheetRanges, r);
+      const r = await fetchSheetChapters(s.gid, s.name);
+      Object.assign(sheetChapters, r);
     }
   } catch (e) {
     statusEl.textContent = "❌ Sheet fetch nahi ho payi: " + e.message + "\n(Sheet 'Anyone with link — Viewer' pe set hai ye check kar lo)";
@@ -132,38 +142,63 @@ async function runCheck() {
   }
   if (!meta) { statusEl.textContent = "❌ meta.json khaali hai Firebase me."; return; }
 
-  const keys = Object.keys(meta).map(k => k.replace(/\.json$/i, ""));
+  const keys = Object.keys(meta).map(k => k.replace(/\.json$/i, "")).filter(k => k !== "important-questions");
   statusEl.textContent = `${keys.length} chapters mile Firebase me. Compare ho raha hai...`;
 
-  let unmatchedCount = 0;
+  const allIssues = []; // {chapter, text}
+  const usedSlugs = new Set();
+
   for (const key of keys) {
-    if (key === "important-questions") continue;
     const res = await fetch(FIREBASE_URL + "/questionBank/files/" + key + ".json");
     const arr = await res.json();
     const total = Array.isArray(arr) ? arr.reduce((max, q) => Math.max(max, q.num || 0), 0) : 0;
 
-    const match = sheetRanges[key];
+    const match = sheetChapters[key];
     const div = document.createElement('div');
     div.className = 'chapter';
-
     let resultHTML;
+
     if (!match) {
-      unmatchedCount++;
-      resultHTML = `<div class="result unmatched">⚠️ Sheet me is naam ki koi row match nahi hui (filename expected: <code>${key}</code>). Neeche manually ranges daal ke check karo.</div>
-        <textarea id="manual-${key}" style="color:#e4e4e7" placeholder="jaise: 1-7  8-14  15-21"></textarea>
-        <button class="main" style="margin-top:6px;padding:6px 12px" onclick="manualCheck('${key}', ${total})">Check</button>
-        <div class="result" id="manual-result-${key}"></div>`;
+      allIssues.push({ chapter: key, text: `Sheet me "${key}" jaisi koi row nahi mili (chapter shayad sheet me hai hi nahi, ya naam match nahi kar raha).` });
+      resultHTML = `<div class="result unmatched">⚠️ Sheet me match nahi hua.</div>`;
     } else {
-      const missing = [];
-      for (let n = 1; n <= total; n++) if (!match.covered.has(n)) missing.push(n);
-      resultHTML = missing.length === 0
-        ? `<div class="result ok">✅ Sab ${total} questions cover ho rahe hain!</div>`
-        : `<div class="result missing">⚠️ ${missing.length} question(s) kabhi revise nahi honge — Q: ${missing.join(', ')}</div>`;
+      usedSlugs.add(key);
+      const covered = new Set();
+      match.cells.forEach(({ day, raw }) => {
+        const m = raw.match(/^(\d+)\s*-\s*(\d+)$/);
+        if (!m) {
+          allIssues.push({ chapter: match.displayName, text: `Day ${day}: samajh nahi aaya format — "${raw}"` });
+          return;
+        }
+        const start = +m[1], end = +m[2];
+        if (start > end) {
+          allIssues.push({ chapter: match.displayName, text: `Day ${day}: range ulta likha hai — "${raw}" (chahiye ${end}-${start})` });
+        }
+        if (start < 1) {
+          allIssues.push({ chapter: match.displayName, text: `Day ${day}: "${raw}" — 1 se pehle ka number likha hai` });
+        }
+        if (total > 0 && Math.max(start, end) > total) {
+          allIssues.push({ chapter: match.displayName, text: `Day ${day}: "${raw}" — is chapter me sirf ${total} questions hain, lekin range ${Math.max(start,end)} tak jaati hai` });
+        }
+        const lo = Math.min(start, end), hi = Math.max(start, end);
+        for (let n = lo; n <= hi; n++) if (n >= 1 && n <= total) covered.add(n);
+      });
+
+      if (total === 0) {
+        allIssues.push({ chapter: match.displayName, text: `Firebase me is chapter ke 0 questions hain — file khaali/missing hai.` });
+        resultHTML = `<div class="result missing">⚠️ Firebase me koi question hi nahi hai.</div>`;
+      } else {
+        const missing = [];
+        for (let n = 1; n <= total; n++) if (!covered.has(n)) missing.push(n);
+        resultHTML = missing.length === 0
+          ? `<div class="result ok">✅ Sab ${total} questions cover ho rahe hain!</div>`
+          : `<div class="result missing">⚠️ ${missing.length} question(s) kabhi revise nahi honge — Q: ${missing.join(', ')}</div>`;
+      }
     }
 
     div.innerHTML = `
       <div class="chapter-head">
-        <div class="chapter-name">${key}${match ? ' <span style="color:#71717a;font-weight:400">('+match.displayName+')</span>' : ''}</div>
+        <div class="chapter-name">${key}${match ? ' <span style="color:#71717a;font-weight:400">('+match.displayName+' — '+match.sheetLabel+')</span>' : ''}</div>
         <div class="chapter-total">${total} questions</div>
       </div>
       ${resultHTML}
@@ -171,23 +206,22 @@ async function runCheck() {
     container.appendChild(div);
   }
 
-  statusEl.textContent = `✅ Done. ${keys.length - 1} chapters check kiye${unmatchedCount ? `, ${unmatchedCount} unmatched (naam mismatch, manually check karo)` : ''}.`;
-}
-
-function manualCheck(key, total) {
-  const input = document.getElementById('manual-' + key).value;
-  const resultEl = document.getElementById('manual-result-' + key);
-  const covered = new Set();
-  (input.match(/\d+\s*-\s*\d+/g) || []).forEach(r => {
-    const [s, e] = r.split('-').map(x => parseInt(x.trim()));
-    const lo = Math.min(s, e), hi = Math.max(s, e);
-    for (let n = lo; n <= hi; n++) covered.add(n);
+  // Sheet me jo chapters hain jo Firebase me bilkul hi nahi hain (naam mismatch ka doosra pehlu)
+  Object.keys(sheetChapters).forEach(slug => {
+    if (!usedSlugs.has(slug)) {
+      allIssues.push({ chapter: sheetChapters[slug].displayName, text: `Sheet me hai (${sheetChapters[slug].sheetLabel}) lekin Firebase me is naam ki koi file nahi mili (expected filename: "${slug}").` });
+    }
   });
-  const missing = [];
-  for (let n = 1; n <= total; n++) if (!covered.has(n)) missing.push(n);
-  resultEl.innerHTML = missing.length === 0
-    ? `<span class="ok">✅ Sab ${total} questions cover ho rahe hain!</span>`
-    : `<span class="missing">⚠️ Missing Q: ${missing.join(', ')}</span>`;
+
+  if (allIssues.length === 0) {
+    issuesEl.innerHTML = `<div class="issues-box clean"><h2>✅ Koi bhi data-issue nahi mila</h2><p style="font-size:13px;color:#9ca3af">Sab chapters, sab ranges sahi hain.</p></div>`;
+  } else {
+    issuesEl.innerHTML = `<div class="issues-box"><h2>⚠️ ${allIssues.length} Data Issue(s) Mile</h2>` +
+      allIssues.map(i => `<div class="issue-row"><span class="issue-chapter">${i.chapter}:</span> <span class="issue-text">${i.text}</span></div>`).join('') +
+      `</div>`;
+  }
+
+  statusEl.textContent = `✅ Done — ${keys.length} Firebase chapters check kiye.`;
 }
 </script>
 </body>
