@@ -22,6 +22,7 @@
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    .flag-btn { border:none; background:none; font-size:14px; cursor:pointer; padding:2px 4px; vertical-align:middle; }
 
     :root {
       --bg: #f3f4f6;
@@ -809,6 +810,7 @@
 const API_MATH = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app/revisionData.json";
 const FIREBASE_URL = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app";
 const QUESTIONS_BASE = FIREBASE_URL + "/questionBank/files/";
+const WORKER_URL_FLAG = "https://deepak3-admin-proxy.ctetone31.workers.dev";
 
 // ── Chapter-order.html tool se save kiya hua custom order apply karta hai ──
 function applyCustomOrder(chapters, order) {
@@ -1250,7 +1252,7 @@ function renderQuestionPageList(content) {
         + '</div>';
     }
     return '<div class="q-page-body">'
-      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+'</div>'
+      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?' <button class="flag-btn" onclick="flagQuestion(\''+ch.questionsFile+'\','+sub.q+')" title="Important ke liye flag karo">🚩</button>':'')+'</div>'
       +   (q
           ? (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
             + (q.text ? '<div class="q-page-eng">'+escH(q.text)+'</div>' : '')
@@ -1288,6 +1290,24 @@ function loadQBank(file, cb) {
 
 // ── Misc ──
 function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
+
+  function flagQuestion(file, num) {
+  haptic();
+  fetch(WORKER_URL_FLAG + '/flag', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file: file, num: num })
+  }).then(function(r){
+    showFlagToast(r.ok ? '🚩 Flag ho gaya!' : 'Flag fail ho gaya');
+  }).catch(function(){ showFlagToast('Network error'); });
+}
+function showFlagToast(msg) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--card);color:var(--text);border:1px solid var(--border);padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;box-shadow:var(--card-shadow);z-index:9999';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 2000);
+}
 
   function smartRefresh() {
   if (currentView === 'questions') { resetTopicCache(); }
