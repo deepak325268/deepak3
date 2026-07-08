@@ -23,6 +23,8 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     .flag-btn { border:none; background:none; font-size:14px; cursor:pointer; padding:2px 4px; vertical-align:middle; }
+    .flag-btn.flagged { color: #ff5252; text-shadow: 0 0 6px rgba(255,82,82,0.5); transform: scale(1.2); }
+    .flag-btn { transition: transform 0.2s, color 0.2s; }
 
     :root {
       --bg: #f3f4f6;
@@ -1252,7 +1254,7 @@ function renderQuestionPageList(content) {
         + '</div>';
     }
     return '<div class="q-page-body">'
-      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?' <button class="flag-btn" onclick="flagQuestion(\''+ch.questionsFile+'\','+sub.q+')" title="Important ke liye flag karo">🚩</button>':'')+'</div>'
+      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?' <button class="flag-btn'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?' flagged':'')+'" onclick="flagQuestion(\''+ch.questionsFile+'\','+sub.q+')" title="Important ke liye flag karo">'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?'🚩':'🏳️')+'</button>':'')+'</div>'
       +   (q
           ? (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
             + (q.text ? '<div class="q-page-eng">'+escH(q.text)+'</div>' : '')
@@ -1293,14 +1295,33 @@ function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
 
   function flagQuestion(file, num) {
   haptic();
+  var btn = event.currentTarget;
+  var key = 'flagged_' + file + '_' + num;
+  var alreadyFlagged = localStorage.getItem(key);
+
   fetch(WORKER_URL_FLAG + '/flag', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file: file, num: num })
   }).then(function(r){
-    showFlagToast(r.ok ? '🚩 Flag ho gaya!' : 'Flag fail ho gaya');
+    if (r.ok) {
+      if (alreadyFlagged) {
+        localStorage.removeItem(key);
+        btn.classList.remove('flagged');
+        btn.textContent = '🏳️';
+        showFlagToast('⬜ Unflag ho gaya!');
+      } else {
+        localStorage.setItem(key, '1');
+        btn.classList.add('flagged');
+        btn.textContent = '🚩';
+        showFlagToast('🚩 Flag ho gaya!');
+      }
+    } else {
+      showFlagToast('Flag fail ho gaya');
+    }
   }).catch(function(){ showFlagToast('Network error'); });
 }
+  
 function showFlagToast(msg) {
   var t = document.createElement('div');
   t.textContent = msg;
