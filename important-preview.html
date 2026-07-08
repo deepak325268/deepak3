@@ -54,10 +54,23 @@
 const FIREBASE_URL = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app";
 
 // index.html jaisa hi — bilkul same formula, taaki result guaranteed match kare
-function willShowToday(q, dayNum) {
-  const freq = q.freq || 2;
-  const actualFreq = (freq === 1) ? 1 : (freq + 1);
-  return dayNum % actualFreq === q.num % actualFreq;
+ function getShowingToday(chapterQs, dayNum) {
+  const groups = {};
+  chapterQs.forEach(q => {
+    const freq = q.freq || 2;
+    if (!groups[freq]) groups[freq] = [];
+    groups[freq].push(q);
+  });
+  const showing = [];
+  Object.keys(groups).forEach(freqKey => {
+    const list = groups[freqKey];
+    const freq = parseInt(freqKey);
+    const actualFreq = (freq === 1) ? 1 : (freq + 1);
+    list.forEach((q, pos) => {
+      if (dayNum % actualFreq === pos % actualFreq) showing.push(q);
+    });
+  });
+  return showing;
 }
 
 function dayNumFor(date) {
@@ -114,7 +127,7 @@ async function run() {
     for (let offset = 0; offset < numDays; offset++) {
       const d = new Date(); d.setDate(d.getDate() + offset);
       const dNum = dayNumFor(d);
-      const showing = chQs.filter(q => willShowToday(q, dNum)).map(q => q.num).sort((a,b)=>a-b);
+      const showing = getShowingToday(chQs, dNum).map(q => q.num).sort((a,b)=>a-b);
       rowsHTML += `
         <tr class="${offset === 0 ? 'today-row' : ''}">
           <td class="day-label">${dayLabel(offset)}</td>
