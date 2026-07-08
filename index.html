@@ -1337,6 +1337,43 @@ function showFlagToast(msg) {
   setTimeout(function(){ t.remove(); }, 2000);
 }
 
+function syncFlagsInBackground() {
+  fetch(WORKER_URL_FLAG + '/proxy/flagged')
+    .then(function(r){ return r.json(); })
+    .then(function(pendingList) {
+      var pendingSet = {};
+      pendingList.forEach(function(f) {
+        pendingSet[f.file + '_' + f.num] = true;
+      });
+
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('flagged_') === 0) {
+          var raw = k.slice('flagged_'.length);
+          if (!pendingSet[raw]) {
+            keysToRemove.push(k);
+          }
+        }
+      }
+
+      keysToRemove.forEach(function(k) {
+        localStorage.removeItem(k);
+      });
+
+      if (keysToRemove.length > 0) {
+        if (typeof renderContent === 'function' && currentView === 'questions') {
+          renderContent();
+        }
+        if (typeof renderImpQuestionList === 'function' && activeTab === 'important' && impView === 'questions') {
+          renderImpQuestionList();
+        }
+      }
+    })
+    .catch(function(e) {});
+}
+
+  
   function smartRefresh() {
   if (currentView === 'questions') { resetTopicCache(); }
   else if (activeTab === 'important' && impView === 'questions') { resetImpTopicCache(); }
@@ -1863,6 +1900,8 @@ function playWrong() {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/deepak3/sw.js');
 }
+syncFlagsInBackground();
+  
 </script>
 </body>
 </html>
