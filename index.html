@@ -1306,8 +1306,9 @@ function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
   var btn = event.currentTarget;
   var key = 'flagged_' + file + '_' + num;
   var alreadyFlagged = localStorage.getItem(key);
+  var endpoint = alreadyFlagged ? '/unflag' : '/flag';
 
-  fetch(WORKER_URL_FLAG + '/flag', {
+  fetch(WORKER_URL_FLAG + endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ file: file, num: num })
@@ -1324,9 +1325,7 @@ function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
         btn.textContent = '🚩';
         showFlagToast('🚩 Flag ho gaya!');
       }
-    } else {
-      showFlagToast('Flag fail ho gaya');
-    }
+    } else { showFlagToast('Fail ho gaya'); }
   }).catch(function(){ showFlagToast('Network error'); });
 }
   
