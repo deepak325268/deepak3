@@ -1254,7 +1254,7 @@ function renderQuestionPageList(content) {
         + '</div>';
     }
     return '<div class="q-page-body">'
-      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?' <button class="flag-btn'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?' flagged':'')+'" onclick="flagQuestion(\''+ch.questionsFile+'\','+sub.q+')" title="Important ke liye flag karo">'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?'🚩':'🏳️')+'</button>':'')+'</div>'
+      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?' <button class="flag-btn'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?' flagged':'')+'" onclick="flagQuestion(\''+ch.questionsFile+'\','+sub.q+')" title="Important ke liye flag karo">'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?'🚩':'🏳️')+'</button>'+(typeof impMarkedSet!=="undefined" && impMarkedSet.has && impMarkedSet.has(ch.questionsFile+"_"+sub.q)?' <span style="font-size:11px;color:#ff9800;font-weight:700;">⭐ IMP</span>':''):'')+'</div>''
       +   (q
           ? (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
             + (q.text ? '<div class="q-page-eng">'+escH(q.text)+'</div>' : '')
@@ -1463,6 +1463,7 @@ var impAllQ   = { math:[], reasoning:[] };
 var impAllQFull = { math:[], reasoning:[] };   // sabhi important questions, bina freq/day filter ke
 var impQIdx   = 0;
 var impLoaded = false;
+var impMarkedSet = new Set();
 var impView = 'home';
 var impChapters = { math: {}, reasoning: {} };
 var impCurrentCh = null;
@@ -1507,7 +1508,8 @@ function loadImportantData(cb) {
           }
         });
       });
-
+      impMarkedSet = new Set();
+      qs.forEach(function(q){ impMarkedSet.add(q._file + '_' + q.num); });
       impLoaded = true;
       cb();
     })
