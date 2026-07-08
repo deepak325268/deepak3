@@ -1,0 +1,1992 @@
+<!DOCTYPE html>
+<html lang="hi" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Question Admin</title>
+<script>MathJax = { tex: { inlineMath: [['$','$']] }, options: { skipHtmlTags: ['script','noscript','style','textarea'] } };</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+<style>
+:root {
+  --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2a2d3a;
+  --accent:#6c63ff; --accent2:#ff6584; --text:#e8eaf6; --muted:#7b7f9e;
+  --success:#4caf82; --error:#ff5252; --warn:#ffb347; --r:10px;
+  --mono:'Courier New',monospace; --fs:15px; --fs-sm:13px; --fs-xs:12px;
+}
+[data-theme="light"] {
+  --bg:#f4f6fa; --surface:#ffffff; --surface2:#eef0f8; --border:#d0d4e8;
+  --accent:#5148e8; --text:#1a1d2e; --muted:#6b6f8a; --success:#2e8f62;
+  --error:#d93030; --warn:#c87a00;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;font-size:var(--fs)}
+
+/* HEADER */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200}
+.logo{width:38px;height:38px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+header h1{font-size:17px;font-weight:700}
+header .sub{font-size:12px;color:var(--muted)}
+.header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+.theme-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.theme-btn:hover{border-color:var(--accent)}
+
+/* TOAST */
+#toast{position:fixed;top:68px;right:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;font-size:var(--fs-sm);max-width:320px;z-index:999;display:none;box-shadow:0 8px 32px rgba(0,0,0,.4);gap:8px;align-items:flex-start}
+#toast.show{display:flex}
+#toast.success{border-color:var(--success);color:var(--success)}
+#toast.error{border-color:var(--error);color:var(--error)}
+#toast.warn{border-color:var(--warn);color:var(--warn)}
+#toast.info{border-color:var(--accent);color:var(--accent)}
+
+/* LAYOUT — full width 2-col */
+.layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 66px)}
+.left-panel{border-right:1px solid var(--border);overflow-y:auto;background:var(--surface);display:flex;flex-direction:column}
+.right-panel{overflow-y:auto;background:var(--bg);padding:20px}
+
+/* LEFT PANEL sections */
+.lp-section{border-bottom:1px solid var(--border);padding:16px}
+.lp-title{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+
+/* inputs */
+label{font-size:var(--fs-xs);color:var(--muted);display:block;margin-bottom:5px;font-weight:500}
+input[type="text"],input[type="password"],select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:9px 12px;font-size:var(--fs-sm);outline:none;transition:border-color .2s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+input[type="password"]{letter-spacing:2px}
+textarea{resize:vertical;font-family:var(--mono);line-height:1.6}
+
+/* PAT row */
+.pat-row{display:flex;gap:6px;align-items:flex-end}
+.pat-row>div{flex:1}
+.badge{font-size:11px;border-radius:5px;padding:3px 8px;white-space:nowrap;display:none}
+.badge.show{display:inline-block}
+.badge-success{color:var(--success);background:rgba(76,175,130,.1);border:1px solid rgba(76,175,130,.3)}
+
+/* file row */
+.file-row{display:flex;gap:6px;align-items:flex-end}
+.file-row>div{flex:1}
+
+/* buttons */
+.btn{padding:9px 16px;border:none;border-radius:7px;font-size:var(--fs-sm);font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){filter:brightness(1.15)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:transparent;border:1px solid var(--error);color:var(--error)}
+.btn-danger:hover{background:rgba(255,82,82,.1)}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover:not(:disabled){filter:brightness(1.1)}
+.btn-warn{background:var(--warn);color:#111}
+.btn-sm{padding:6px 11px;font-size:var(--fs-xs)}
+.btn-xs{padding:4px 8px;font-size:11px}
+
+/* status bar */
+.status-bar{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:9px 13px;font-size:var(--fs-xs);font-family:var(--mono);color:var(--muted);margin-top:10px;display:none}
+.status-bar.show{display:block}
+.status-bar.ok{color:var(--success);border-color:rgba(76,175,130,.3)}
+.status-bar.err{color:var(--error);border-color:rgba(255,82,82,.3)}
+
+/* mode tabs */
+.mode-tabs{display:flex;gap:4px;background:var(--bg);border-radius:8px;padding:4px;margin-bottom:14px}
+.mode-tab{flex:1;padding:8px;text-align:center;font-size:var(--fs-xs);font-weight:600;border-radius:6px;cursor:pointer;color:var(--muted);transition:all .2s}
+.mode-tab.active{background:var(--accent);color:#fff}
+
+.warn-box{background:rgba(255,179,71,.08);border:1px solid rgba(255,179,71,.25);border-radius:7px;padding:9px 13px;font-size:var(--fs-xs);color:var(--warn);margin-bottom:12px;display:none}
+
+/* ACTION ROW */
+.action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;flex-shrink:0}
+
+/* ═══════════════════════════════════════
+   RIGHT PANEL — QUESTIONS EDITOR
+═══════════════════════════════════════ */
+.rp-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:50;background:var(--bg);padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:16px}
+.rp-title{font-size:18px;font-weight:700;flex:1}
+.q-total-badge{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:var(--fs-xs);color:var(--accent);font-weight:600}
+
+/* SEARCH / FILTER TOOLBAR */
+.rp-toolbar{display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:0 0 14px}
+.search-box{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:0 10px;flex:1;min-width:200px;max-width:340px;transition:border-color .2s}
+.search-box:focus-within{border-color:var(--accent)}
+.search-box .search-icon{font-size:13px;color:var(--muted);flex-shrink:0}
+.search-box input{border:none;background:transparent;padding:8px 0;font-size:var(--fs-sm)}
+.search-box input:focus{border:none}
+.search-clear-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 4px;flex-shrink:0}
+.search-clear-btn:hover{color:var(--error)}
+.missing-ans-btn{display:none;background:rgba(255,179,71,.1);border:1px solid var(--warn);color:var(--warn);border-radius:7px;padding:7px 12px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;white-space:nowrap;align-items:center;gap:4px;transition:all .2s}
+.missing-ans-btn:hover{background:rgba(255,179,71,.2)}
+.missing-ans-btn.active-filter{background:var(--accent);border-color:var(--accent);color:#fff}
+.draft-indicator{font-size:11px;color:var(--success);opacity:0;transition:opacity .4s;white-space:nowrap;margin-left:auto}
+.draft-indicator.show{opacity:1}
+
+/* question card in editor */
+.qe-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:border-color .2s}
+.qe-card.editing{border-color:var(--accent)}
+.qe-card.new-q{border-color:var(--success)}
+.qe-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);cursor:pointer;user-select:none}
+.qe-num{font-size:13px;font-weight:700;color:var(--accent);min-width:32px}
+.qe-preview{flex:1;font-size:var(--fs-q-text,15px);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qe-badge{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:700}
+.qe-badge-new{background:rgba(76,175,130,.15);color:var(--success);border:1px solid rgba(76,175,130,.3)}
+.qe-badge-imp{background:rgba(245,166,35,.15);color:#f5a623;border:1px solid rgba(245,166,35,.35)}
+.qe-head-btns{display:flex;gap:4px;flex-shrink:0}
+.qe-body{padding:14px;display:none;border-top:1px solid var(--border)}
+.qe-body.open{display:block}
+
+/* mini preview inside card */
+.qe-mini-preview{display:none;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg)}
+.qe-mini-preview.open{display:block}
+.qe-mini-preview .pv-hindi{font-size:var(--fs-q-text,15px);color:var(--text);margin-bottom:6px;line-height:1.6}
+.qe-mini-preview .pv-text{font-size:var(--fs-q-text,15px);color:var(--muted);margin-bottom:10px;line-height:1.6}
+.qe-mini-preview .pv-opts{display:flex;flex-wrap:wrap;gap:6px}
+.qe-mini-preview .pv-opt{background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.25);border-radius:5px;padding:5px 12px;font-size:var(--fs-opt-text,13px);color:var(--accent)}
+
+/* inline edit fields */
+.field-group{margin-bottom:10px}
+.field-group label{margin-bottom:4px}
+.field-row{display:flex;gap:6px}
+.field-row textarea{flex:1}
+.opt-row{display:flex;gap:0;align-items:center;margin-bottom:6px;border:1px solid var(--border);border-radius:7px;overflow:hidden;transition:border-color .2s}
+.opt-row:has(input[type="radio"]:checked){border-color:var(--success)}
+.opt-row label.opt-radio-lbl{display:flex;align-items:center;padding:0 10px;background:var(--surface2);cursor:pointer;height:100%;border-right:1px solid var(--border);min-height:36px}
+.opt-row input[type="radio"]{width:15px;height:15px;accent-color:var(--success);cursor:pointer;margin:0}
+.opt-row input[type="text"]{flex:1;border:none;border-radius:0;background:transparent;padding:8px 10px}
+.opt-row input[type="text"]:focus{border:none;box-shadow:none}
+.opt-row .btn-xs{border-radius:0;border:none;border-left:1px solid var(--border);padding:8px 10px;height:100%}
+.opt-row .btn-xs{flex-shrink:0}
+
+/* insert zone */
+.insert-zone{text-align:center;padding:6px;opacity:0;transition:opacity .2s}
+.insert-zone:hover{opacity:1}
+.insert-btn{background:transparent;border:1px dashed var(--success);color:var(--success);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:600}
+.insert-btn:hover{background:rgba(76,175,130,.1)}
+
+/* drag handle */
+.drag-handle{cursor:grab;color:var(--muted);font-size:14px;padding:0 2px;user-select:none}
+.drag-handle:active{cursor:grabbing}
+.qe-card.drag-over{border-color:var(--accent2);border-style:dashed}
+
+/* empty state */
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state .icon{font-size:48px;margin-bottom:12px}
+.empty-state p{font-size:var(--fs-sm)}
+
+/* spinner */
+.spinner{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;margin-right:5px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+
+/* scrollbars */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* settings collapse */
+.lp-title-row{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.lp-title-row .lp-title{margin-bottom:0}
+.collapse-btn{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:2px 6px;border-radius:4px;transition:all .2s}
+.collapse-btn:hover{color:var(--text);background:var(--surface2)}
+.lp-collapsible{transition:all .2s}
+.lp-collapsible.hidden{display:none}
+
+/* font size slider */
+.slider-row{display:flex;align-items:center;gap:8px;padding:8px 0}
+.slider-row label{margin:0;white-space:nowrap;min-width:80px}
+input[type="range"]{-webkit-appearance:none;appearance:none;height:4px;background:var(--border);border-radius:2px;outline:none;cursor:pointer;flex:1;padding:0}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer}
+.slider-val{font-size:12px;color:var(--accent);font-weight:700;min-width:30px;text-align:right}
+
+/* json textarea flex grow */
+.lp-add-section{display:flex;flex-direction:column;flex:1;padding:16px;border-bottom:1px solid var(--border);min-height:0;overflow-y:auto}
+.lp-add-section>*:not(textarea){flex-shrink:0}
+.lp-add-section textarea{flex:1;min-height:70px;resize:none}
+
+/* JSON full-screen expand editor */
+.json-expand-overlay{display:none;position:fixed;inset:0;background:var(--bg);z-index:3000;flex-direction:column;padding:16px}
+.json-expand-overlay.show{display:flex}
+.json-expand-header{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0}
+.json-expand-title{font-weight:700;font-size:var(--fs)}
+.json-expand-actions{display:flex;gap:8px}
+.json-expand-textarea{flex:1;width:100%;font-family:var(--mono);font-size:14px;line-height:1.6;resize:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;color:var(--text);outline:none}
+.json-expand-textarea:focus{border-color:var(--accent)}
+@media(max-width:600px){
+  .json-expand-header{flex-direction:column;align-items:stretch}
+  .json-expand-actions{width:100%}
+  .json-expand-actions .btn{flex:1}
+}
+
+/* save bar */
+.save-bar{position:sticky;bottom:0;background:var(--bg);border-top:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:10px;margin-top:16px}
+.save-bar-info{font-size:var(--fs-xs);color:var(--muted);flex:1}
+
+/* ═══════════════════════════════════════
+   FLAGGED QUESTIONS PANEL
+═══════════════════════════════════════ */
+.flag-panel{display:none}
+.flag-panel.show{display:block}
+.flag-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.flag-header h2{font-size:18px;font-weight:700;flex:1}
+.flag-count-badge{background:rgba(255,101,132,.15);border:1px solid rgba(255,101,132,.3);border-radius:20px;padding:4px 14px;font-size:var(--fs-xs);color:var(--accent2);font-weight:600}
+.flag-empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.flag-empty .icon{font-size:48px;margin-bottom:12px}
+.flag-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;display:flex;align-items:flex-start;gap:12px;transition:all .3s ease;animation:flagSlideIn .3s ease}
+@keyframes flagSlideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.flag-card:hover{border-color:var(--accent2)}
+.flag-card .flag-icon{font-size:22px;flex-shrink:0;margin-top:2px}
+.flag-card .flag-info{flex:1;min-width:0}
+.flag-card .flag-file{font-size:var(--fs-sm);font-weight:700;color:var(--accent)}
+.flag-card .flag-qnum{font-size:var(--fs-sm);color:var(--text);margin-top:2px}
+.flag-card .flag-time{font-size:11px;color:var(--muted);margin-top:4px}
+.flag-card .flag-actions{display:flex;gap:6px;flex-shrink:0;align-items:center}
+.flag-card.removing{opacity:0;transform:translateX(40px);transition:all .35s ease}
+.rp-tab .tab-badge{display:inline-block;background:var(--accent2);color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px;min-width:16px;text-align:center;line-height:1.5;vertical-align:middle;animation:badgePulse 2s infinite}
+@keyframes badgePulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+
+/* right panel view tabs */
+.rp-view-tabs{display:flex;gap:3px;background:var(--surface2);border-radius:8px;padding:3px}
+.rp-tab{padding:6px 14px;font-size:var(--fs-xs);font-weight:600;border-radius:6px;cursor:pointer;color:var(--muted);transition:all .2s;white-space:nowrap}
+.rp-tab.active{background:var(--accent);color:#fff}
+
+/* preview cards */
+.pv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.pv-num{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:5px}
+.pv-text{font-size:var(--fs-q-text,15px);line-height:1.6;margin-bottom:6px}
+.pv-hindi{font-size:var(--fs-q-text,15px);color:var(--muted);margin-bottom:10px;line-height:1.5}
+.pv-opts{display:flex;flex-wrap:wrap;gap:6px}
+.pv-opt{background:rgba(108,99,255,.1);border:1px solid rgba(108,99,255,.25);border-radius:5px;padding:4px 12px;font-size:var(--fs-opt-text,13px);color:var(--accent)}
+
+/* ═══════════════════════════════════════
+   MOBILE ONLY — everything below is scoped to
+   @media(max-width:860px). Desktop (>860px) is
+   100% untouched / unchanged.
+═══════════════════════════════════════ */
+.hamburger-btn{display:none;background:var(--surface2);border:1px solid var(--border);color:var(--text);width:36px;height:36px;border-radius:8px;cursor:pointer;font-size:18px;align-items:center;justify-content:center;flex-shrink:0}
+.hamburger-btn:hover{border-color:var(--accent)}
+.mobile-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;opacity:0;transition:opacity .25s}
+.mobile-overlay.show{display:block;opacity:1}
+
+@media (max-width:860px){
+  header{padding:14px 14px;gap:8px}
+  header .sub{display:none}
+  .hamburger-btn{display:flex}
+
+  /* stack: left-panel becomes a slide-in drawer, right-panel takes full width */
+  .layout{display:block;position:relative;overflow:hidden;height:calc(100vh - 66px);height:calc(100dvh - 66px)}
+
+  .left-panel{
+    position:fixed;top:66px;left:0;bottom:0;
+    width:86%;max-width:340px;
+    height:calc(100vh - 66px);height:calc(100dvh - 66px);
+    transform:translateX(-100%);
+    transition:transform .25s ease;
+    z-index:450;
+    border-right:none;
+    box-shadow:6px 0 28px rgba(0,0,0,.45);
+  }
+  .left-panel.open{transform:translateX(0)}
+
+  .right-panel{width:100%;height:100%;padding:14px 14px 30px}
+
+  /* HTML5 drag-and-drop doesn't work via touch — hide the non-functional handle,
+     reordering still works via the ↑ / ↓ buttons inside each question */
+  .drag-handle{display:none}
+
+  /* ≥16px stops iOS Safari auto-zooming inputs on focus */
+  input[type="text"],input[type="password"],select,textarea{font-size:16px}
+
+  #toast{left:12px;right:12px;max-width:none;top:74px}
+
+  .rp-header{gap:8px}
+  .rp-title{font-size:16px}
+
+  .qe-head{padding:10px}
+  .qe-head-btns .btn-xs{padding:6px 9px}
+}
+</style>
+</head>
+<body>
+
+  
+<body>
+
+<!-- ===== PASSWORD LOCK ===== -->
+<div id="lock-screen" style="
+  position:fixed;inset:0;background:#0f1117;z-index:9999;
+  display:flex;align-items:center;justify-content:center">
+  <div style="background:#1a1d27;border:1px solid #2a2d3a;border-radius:14px;padding:36px 40px;width:min(320px,92vw);text-align:center">
+    <div style="font-size:40px;margin-bottom:12px">🔐</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:6px">Question Admin</div>
+    <div style="font-size:13px;color:#7b7f9e;margin-bottom:24px">Password</div>
+    <input type="password" id="lock-input" placeholder="Password..."
+      style="width:100%;background:#0f1117;border:1px solid #2a2d3a;border-radius:8px;
+      color:#e8eaf6;padding:11px 14px;font-size:15px;outline:none;text-align:center;letter-spacing:3px;margin-bottom:8px"
+      onkeydown="if(event.key==='Enter') checkPass()">
+    <div id="lock-err" style="color:#ff5252;font-size:12px;height:18px;margin-bottom:8px"></div>
+    <button id="lock-btn" onclick="checkPass()"
+      style="width:100%;background:#6c63ff;color:#fff;border:none;border-radius:8px;
+      padding:12px;font-size:15px;font-weight:700;cursor:pointer">
+      🔓 Enter
+    </button>
+  </div>
+</div>
+
+<script>
+// 👇 Cloudflare Worker deploy karne ke baad yahan uska URL daalo
+const WORKER_URL = "https://deepak3-admin-proxy.ctetone31.workers.dev";
+
+function getToken() { return localStorage.getItem('session_token') || ''; }
+
+(function(){
+  const btn = document.getElementById('lock-btn');
+  async function checkPass(){
+    const val = document.getElementById('lock-input').value;
+    const err = document.getElementById('lock-err');
+    err.textContent = '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Check ho raha hai...'; }
+    try {
+      const r = await fetch(`${WORKER_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: val })
+      });
+      if (!r.ok) throw new Error('wrong');
+      const data = await r.json();
+      localStorage.setItem('session_token', data.token);
+      document.getElementById('lock-screen').style.display = 'none';
+      if (window.afterLogin) window.afterLogin();
+    } catch (e) {
+      err.textContent = '❌ Galat password ya server se connect nahi ho paaya!';
+      document.getElementById('lock-input').value = '';
+      document.getElementById('lock-input').focus();
+      setTimeout(() => err.textContent = '', 3000);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = '🔓 Enter'; }
+    }
+  }
+  window.checkPass = checkPass;
+  // Already unlocked this session?
+  if (getToken()) {
+    document.getElementById('lock-screen').style.display = 'none';
+  }
+  // Auto-focus
+  setTimeout(() => document.getElementById('lock-input')?.focus(), 100);
+})();
+</script>
+<!-- ===== END LOCK ===== -->
+  
+<header>
+  <button class="hamburger-btn" id="hamburger-btn" onclick="toggleMobileDrawer()" title="Menu" aria-label="Menu">☰</button>
+  <div class="logo">📚</div>
+  <div>
+    <h1>Question Admin</h1>
+    <div class="sub">deepak325268 / deepak3</div>
+  </div>
+  <div class="header-right">
+    <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" title="Light/Dark">🌙</button>
+  </div>
+</header>
+
+<div id="toast"></div>
+
+<div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileDrawer()"></div>
+
+<div class="json-expand-overlay" id="json-expand-overlay">
+  <div class="json-expand-header">
+    <div class="json-expand-title">📝 JSON Editor — Full Screen</div>
+    <div class="json-expand-actions">
+      <button type="button" class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="closeJsonExpand(false)">✖ Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="closeJsonExpand(true)">✅ Apply &amp; Close</button>
+    </div>
+  </div>
+  <textarea id="json-input-expanded" class="json-expand-textarea" spellcheck="false" placeholder='[
+  {
+    "num": 1,
+    "text": "Question text",
+    "hindi": "हिंदी प्रश्न",
+    "opts": ["(a) A","(b) B","(c) C","(d) D"],
+    "ans": "b"
+  }
+]'></textarea>
+</div>
+
+<div class="layout">
+
+  <div class="left-panel" id="left-panel">
+
+    <div class="lp-section" id="gh-section">
+      <div class="lp-title-row" onclick="toggleSettings()">
+        <div class="lp-title" style="margin-bottom:0">⚙️ Firebase Settings</div>
+        <button class="collapse-btn" id="settings-toggle-btn" title="Chhupaao/Dikhaao">▲</button>
+      </div>
+      <div class="lp-collapsible" id="settings-body" style="margin-top:12px">
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:10px 12px;display:flex;align-items:center;gap:8px">
+          <span style="color:var(--success);font-size:16px">🔒</span>
+          <div style="flex:1;font-size:12px;color:var(--muted)">Session server-side verify ho raha hai — Firebase secret ab bhi browser mein store nahi hota</div>
+        </div>
+        <button class="btn btn-outline btn-sm" style="width:100%;margin-top:8px" onclick="logout()">🚪 Logout</button>
+        <div class="status-bar" id="status-bar"></div>
+
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px">🔤 Text Size</div>
+          <div class="slider-row">
+            <label>Questions</label>
+            <input type="range" id="fs-q" min="12" max="22" value="15" oninput="applyFontSize('q',this.value)">
+            <span class="slider-val" id="fs-q-val">15px</span>
+          </div>
+          <div class="slider-row">
+            <label>Options</label>
+            <input type="range" id="fs-opt" min="11" max="20" value="13" oninput="applyFontSize('opt',this.value)">
+            <span class="slider-val" id="fs-opt-val">13px</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lp-section">
+      <div class="lp-title">📁 Chapter File</div>
+      <div class="file-row">
+        <div>
+          <label>Select File</label>
+          <select id="file-select" onchange="onFileSelect()">
+            <option value="">-- Select karo --</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="loadFiles()" style="margin-top:18px" title="Refresh">🔄</button>
+      </div>
+      <div style="margin-top:10px">
+        <label>Ya Naya File Naam</label>
+        <input type="text" id="new-filename" placeholder="e.g. percentage.json" oninput="onNewFilename()">
+      </div>
+      <div style="margin-top:10px">
+        <label>Subject</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="file-subject" onchange="saveSubjectLocally()" style="flex:1">
+            <option value="">-- Select karo --</option>
+            <option value="math">📐 Math</option>
+            <option value="reasoning">🧠 Reasoning</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="saveSubjectOnly()" title="Sirf subject Firebase pe save karo">💾</button>
+        </div>
+        <div id="subject-status" style="margin-top:4px;font-size:11px"></div>
+      </div>
+      <div id="file-info" style="margin-top:8px;font-size:12px;color:var(--muted)"></div>
+      <button class="btn btn-outline btn-xs" onclick="forceReloadFromGitHub()" style="margin-top:6px;width:100%" title="Draft/local changes ignore karke Firebase se fresh copy lao">↻ Firebase se Fresh Reload</button>
+    </div>
+
+    <div class="lp-add-section">
+      <div class="lp-title">➕ Naye Questions Add</div>
+
+      <div class="mode-tabs">
+        <div class="mode-tab active" id="tab-append" onclick="setMode('append')">Append</div>
+        <div class="mode-tab" id="tab-replace" onclick="setMode('replace')">Replace All</div>
+      </div>
+
+      <div class="warn-box" id="merge-info">⚠️ Replace mode: File ka poora content replace ho jaayega!</div>
+
+      <div style="margin-bottom:10px">
+        <label>📁 JSON File Upload karo</label>
+        <button type="button" class="btn btn-outline btn-sm" style="width:100%" onclick="document.getElementById('json-file-input').click()">📂 File Choose karo</button>
+        <input type="file" id="json-file-input" accept=".json,application/json" style="display:none" onchange="handleJsonFileUpload(event)">
+        <div id="json-file-name" style="font-size:11px;color:var(--muted);margin-top:5px"></div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin:2px 0 10px;color:var(--muted);font-size:11px">
+        <hr style="flex:1;margin:0"><span>YA</span><hr style="flex:1;margin:0">
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <label style="margin-bottom:0">JSON Paste karo</label>
+        <button type="button" class="btn btn-outline btn-xs" style="padding:3px 9px" onclick="openJsonExpand()" title="Bade screen me edit karo">⛶ Expand</button>
+      </div>
+      <textarea id="json-input" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor='var(--border)'" ondrop="handleJsonFileDrop(event)" placeholder='[
+  {
+    "num": 1,
+    "text": "Question text",
+    "hindi": "हिंदी प्रश्न",
+    "opts": ["(a) A","(b) B","(c) C","(d) D"],
+    "ans": "b"
+  }
+]'></textarea>
+
+      <div class="action-row">
+        <button class="btn btn-primary btn-sm" onclick="parseAndPreview()">👁️ Preview</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="clearInput()">🗑️ Clear</button>
+      </div>
+    </div>
+
+    <div style="padding:14px;border-top:1px solid var(--border);background:var(--surface)">
+      <div id="save-target-box" style="background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:12px;display:none">
+        <span style="color:var(--muted)">Save hoga →</span>
+        <span id="save-target-name" style="color:var(--accent);font-weight:700;margin-left:4px"></span>
+      </div>
+      <button class="btn btn-success" id="save-btn" onclick="saveToGitHub()" disabled style="width:100%;padding:12px;font-size:15px">
+        ⬆️ Firebase pe Save karo
+      </button>
+      <div id="save-info" style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px"></div>
+    </div>
+
+  </div>
+
+  <div class="right-panel" id="right-panel">
+    <div class="rp-header">
+      <div class="rp-title" id="rp-title">Questions Editor</div>
+      <span class="q-total-badge" id="q-total">0 questions</span>
+      <div class="rp-view-tabs" id="rp-view-tabs">
+        <div class="rp-tab active" id="rtab-editor" onclick="switchRTab('editor')">✏️ Editor</div>
+        <div class="rp-tab" id="rtab-preview" onclick="switchRTab('preview')">👁️ Preview</div>
+        <div class="rp-tab" id="rtab-flagged" onclick="switchRTab('flagged')">🚩 Flagged <span id="flag-tab-badge" class="tab-badge" style="display:none"></span></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="expandAll()">📖 Sab Kholo</button>
+      <button class="btn btn-outline btn-sm" onclick="collapseAll()">📕 Sab Band</button>
+      <button class="btn btn-outline btn-sm" onclick="renumberAll()">🔢 Renumber</button>
+    </div>
+
+    <div class="rp-toolbar" id="rp-toolbar">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="q-search" placeholder="Q number ya text se search karo..." oninput="onSearchInput(this.value)">
+        <button class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()" style="display:none" title="Search clear karo">✕</button>
+      </div>
+      <button class="missing-ans-btn" id="missing-ans-btn" onclick="toggleMissingFilter()"></button>
+      <span class="draft-indicator" id="draft-save-indicator">📝 Auto-saved abhi</span>
+    </div>
+
+    <div id="q-editor-list">
+      <div class="empty-state">
+        <div class="icon">📂</div>
+        <p>Left se file select karo<br>ya naya chapter naam dalo</p>
+      </div>
+    </div>
+
+    <div id="q-preview-panel" style="display:none">
+      <div id="preview-confirm-bar" style="display:none;background:var(--surface);border:1px solid var(--success);border-radius:var(--r);padding:12px 16px;margin-bottom:16px;display:none;align-items:center;gap:10px;flex-wrap:wrap">
+        <span id="preview-count-label" style="flex:1;font-size:14px;font-weight:600;color:var(--success)"></span>
+        <button class="btn btn-success" onclick="confirmAndAdd()">✅ Confirm & Add to Editor</button>
+        <button class="btn btn-outline btn-sm" onclick="cancelPreview()">✕ Cancel</button>
+      </div>
+      <div id="preview-cards-list"></div>
+    </div>
+
+    <!-- ═══════ FLAGGED QUESTIONS PANEL ═══════ -->
+    <div id="q-flagged-panel" class="flag-panel">
+      <div class="flag-header">
+        <h2>🚩 Flagged Questions</h2>
+        <span class="flag-count-badge" id="flag-count-badge">0 pending</span>
+        <button class="btn btn-outline btn-sm" onclick="loadFlaggedQuestions()" title="Refresh">🔄 Refresh</button>
+      </div>
+      <div id="flagged-list">
+        <div class="flag-empty">
+          <div class="icon">🚩</div>
+          <p>Koi flagged question nahi hai abhi<br>Users index se questions flag kar sakte hain</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let currentMode = 'append';
+let existingQ   = [];
+let currentFile = '';
+let currentSHA  = '';
+let dirty       = false;   // unsaved changes?
+let savedSnapshot = '[]';  // JSON snapshot of existingQ as last loaded/saved from GitHub — used to detect real changes vs undone edits
+let dragSrcIdx  = null;
+let savedSubject = '';     // last known subject value saved on GitHub (meta.json)
+let searchQuery       = '';    // question search/filter text
+let filterMissingOnly = false; // "answer missing" quick-filter active?
+let lastVisibleCount  = 0;     // how many cards matched the last render (for badge)
+let activeRTab        = 'editor'; // which right-panel tab is currently shown
+let flaggedItems      = [];    // pending flagged questions from Firebase
+
+// ═══════════════════════════════════════════
+//  UNSAVED CHANGES WARNING + Ctrl/Cmd+S SHORTCUT
+// ═══════════════════════════════════════════
+window.addEventListener('beforeunload', function(e) {
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && document.getElementById('json-expand-overlay').classList.contains('show')) {
+    closeJsonExpand(false);
+    return;
+  }
+  const isSaveCombo = (e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S');
+  if (!isSaveCombo) return;
+  e.preventDefault();
+  const btn = document.getElementById('save-btn');
+  if (btn && !btn.disabled) {
+    saveToGitHub();
+  } else if (dirty) {
+    toast('Pehle file naam / login check karo — Save disabled hai!','warn');
+  }
+});
+
+// ═══════════════════════════════════════════
+//  MOBILE DRAWER (left-panel slide-in, only relevant ≤860px)
+// ═══════════════════════════════════════════
+function openMobileDrawer() {
+  document.getElementById('left-panel').classList.add('open');
+  document.getElementById('mobile-overlay').classList.add('show');
+}
+function closeMobileDrawer() {
+  document.getElementById('left-panel').classList.remove('open');
+  document.getElementById('mobile-overlay').classList.remove('show');
+}
+function toggleMobileDrawer() {
+  const lp = document.getElementById('left-panel');
+  if (lp.classList.contains('open')) closeMobileDrawer(); else openMobileDrawer();
+}
+function closeMobileDrawerIfMobile() {
+  if (window.innerWidth <= 860) closeMobileDrawer();
+}
+
+// ═══════════════════════════════════════════
+//  DRAFT AUTO-SAVE (localStorage) — refresh/reload pe
+//  currently-open file + unsaved edits waapis aa jaate hain
+// ═══════════════════════════════════════════
+const DRAFT_KEY = 'admin_draft_v1';
+
+function saveDraft() {
+  try {
+    if (!currentFile) { localStorage.removeItem(DRAFT_KEY); return; }
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      file: currentFile,
+      sha: currentSHA,
+      questions: existingQ,
+      dirty: dirty,
+      snapshot: savedSnapshot,
+      ts: Date.now()
+    }));
+    if (dirty) pingDraftSaved();
+  } catch(e) { console.warn('draft save failed', e); }
+}
+
+function pingDraftSaved() {
+  const el = document.getElementById('draft-save-indicator');
+  if (!el) return;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_KEY);
+}
+
+function restoreDraftIfAny() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch(e) { draft = null; }
+  if (!draft || !draft.file || !Array.isArray(draft.questions)) return;
+
+  currentFile = draft.file;
+  currentSHA  = draft.sha || '';
+  existingQ   = draft.questions;
+  dirty       = !!draft.dirty;
+  savedSnapshot = typeof draft.snapshot === 'string' ? draft.snapshot : '';
+
+  const sel = document.getElementById('file-select');
+  const isKnownFile = Array.from(sel.options).some(o => o.value === draft.file);
+  if (isKnownFile) {
+    sel.value = draft.file;
+    document.getElementById('new-filename').value = '';
+  } else {
+    sel.value = '';
+    document.getElementById('new-filename').value = draft.file;
+  }
+  loadSubject(draft.file);
+
+  renderEditor();
+  updateFileInfo();
+  updateSaveBtn();
+
+  if (dirty) {
+    toast(`📝 Draft restore ho gaya — ${draft.file} (${existingQ.length} questions, unsaved changes). Save karna mat bhoolna!`, 'warn', 7000);
+  } else if (existingQ.length) {
+    toast(`📝 ${draft.file} waapis khul gayi (${existingQ.length} questions)`, 'info', 4000);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+window.onload = async function() {
+  const th = localStorage.getItem('theme') || 'dark';
+  setTheme(th);
+
+  const fsQ   = localStorage.getItem('fs_q')   || '15';
+  const fsOpt = localStorage.getItem('fs_opt') || '13';
+  document.getElementById('fs-q').value   = fsQ;
+  document.getElementById('fs-opt').value = fsOpt;
+  applyFontSize('q',   fsQ,   false);
+  applyFontSize('opt', fsOpt, false);
+
+  const collapsed = localStorage.getItem('settings_collapsed') === '1';
+  if (collapsed) collapseSettings(false);
+
+  if (getToken()) { await loadFiles(); restoreDraftIfAny(); loadFlaggedQuestions(); }
+};
+
+// Login hone ke baad (checkPass() se call hota hai)
+window.afterLogin = async function() {
+  await loadFiles();
+  restoreDraftIfAny();
+  loadFlaggedQuestions();
+};
+
+function logout() {
+  localStorage.removeItem('session_token');
+  location.reload();
+}
+
+// ═══════════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════════
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('theme-btn').textContent = t==='dark' ? '🌙' : '☀️';
+  localStorage.setItem('theme', t);
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  setTheme(cur==='dark' ? 'light' : 'dark');
+}
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+function toast(msg, type='info', dur=3000) {
+  const el = document.getElementById('toast');
+  const icons = {success:'✅',error:'❌',warn:'⚠️',info:'ℹ️'};
+  el.className = 'show ' + type;
+  el.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════
+function getFilename() {
+  return document.getElementById('new-filename').value.trim()
+      || document.getElementById('file-select').value;
+}
+
+// ═══════════════════════════════════════════
+//  SECURE GITHUB PROXY (Cloudflare Worker ke through)
+//  PAT yahan kabhi nahi aata — sirf session token jaata hai
+// ═══════════════════════════════════════════
+async function ghFetch(path, options = {}) {
+  const token = getToken();
+  const res = await fetch(`${WORKER_URL}/proxy/${path}`, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem('session_token');
+    toast('Session expire ho gaya — dobara login karo', 'error');
+    document.getElementById('lock-screen').style.display = 'flex';
+    throw new Error('Unauthorized');
+  }
+  return res;
+}
+
+// ═══════════════════════════════════════════
+//  SETTINGS COLLAPSE
+// ═══════════════════════════════════════════
+function toggleSettings() {
+  const body = document.getElementById('settings-body');
+  const isHidden = body.classList.contains('hidden');
+  if (isHidden) {
+    body.classList.remove('hidden');
+    document.getElementById('settings-toggle-btn').textContent = '▲';
+    localStorage.setItem('settings_collapsed','0');
+  } else {
+    collapseSettings(true);
+  }
+}
+function collapseSettings(save=true) {
+  document.getElementById('settings-body').classList.add('hidden');
+  document.getElementById('settings-toggle-btn').textContent = '▼';
+  if (save) localStorage.setItem('settings_collapsed','1');
+}
+
+// ═══════════════════════════════════════════
+//  FONT SIZE SLIDER
+// ═══════════════════════════════════════════
+function applyFontSize(type, val, saveLS=true) {
+  val = parseInt(val);
+  if (type==='q') {
+    document.getElementById('fs-q-val').textContent = val+'px';
+    document.querySelectorAll('.qe-preview, .pv-text, .qe-body textarea').forEach(el => el.style.fontSize = val+'px');
+    document.documentElement.style.setProperty('--fs-q-text', val+'px');
+    if (saveLS) localStorage.setItem('fs_q', val);
+  } else {
+    document.getElementById('fs-opt-val').textContent = val+'px';
+    document.querySelectorAll('.pv-opt, .opt-row input').forEach(el => el.style.fontSize = val+'px');
+    document.documentElement.style.setProperty('--fs-opt-text', val+'px');
+    if (saveLS) localStorage.setItem('fs_opt', val);
+  }
+}
+
+async function checkConnection() {
+  const sb = document.getElementById('status-bar');
+  sb.className = 'status-bar show'; sb.textContent = 'Checking...';
+  try {
+    const r = await ghFetch(``);
+    if (r.ok) {
+      const d = await r.json();
+      sb.className = 'status-bar show ok';
+      sb.textContent = `✅ ${d.full_name} — ${d.private ? 'Private' : 'Public'}`;
+    } else {
+      sb.className = 'status-bar show err'; sb.textContent = '❌ Connection error';
+    }
+  } catch (e) {
+    sb.className = 'status-bar show err'; sb.textContent = '❌ ' + e.message;
+  }
+}
+
+// ═══════════════════════════════════════════
+//  LOAD FILES (सुरक्षित तरीके से meta.json सिंक किया गया)
+// ═══════════════════════════════════════════
+async function loadFiles() {
+  if (!getToken()) return;
+  try {
+    checkConnection();
+    // meta.json को सुरक्षित फ़ेच करना
+    try {
+      const metaRes = await ghFetch(`contents/questions/meta.json?t=${Date.now()}`);
+      if (metaRes.ok) {
+        const d = await metaRes.json();
+        if (d && d.content) {
+          const decryptedMeta = decodeURIComponent(escape(atob(d.content.replace(/\n/g,''))));
+          localStorage.setItem('file_subjects', decryptedMeta);
+        }
+      }
+    } catch(err) {
+      console.warn("Meta JSON recovery sync failed, using localStorage cache.");
+    }
+
+    const r = await ghFetch(`contents/questions`);
+    if (!r.ok) return;
+    const files = await r.json();
+    const sel = document.getElementById('file-select');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">-- Select karo --</option>';
+    files.filter(f=>f.name.endsWith('.json') && f.name !== 'important-questions.json' && f.name !== 'meta.json').sort((a,b)=>a.name.localeCompare(b.name)).forEach(f=>{
+      const opt = document.createElement('option');
+      opt.value = f.name; opt.textContent = f.name;
+      sel.appendChild(opt);
+    });
+    if (prev) sel.value = prev;
+  } catch(e) {}
+}
+
+// ═══════════════════════════════════════════
+//  FILE SELECT
+// ═══════════════════════════════════════════
+async function onFileSelect() {
+  const sel = document.getElementById('file-select').value;
+  document.getElementById('new-filename').value = '';
+  if (!sel) { currentFile=''; existingQ=[]; renderEditor(); return; }
+  currentFile = sel;
+  loadSubject(sel);
+  closeMobileDrawerIfMobile();
+  await loadExistingFile(sel);
+}
+
+function onNewFilename() {
+  const val = document.getElementById('new-filename').value.trim();
+  if (val) {
+    currentFile = val;
+    existingQ = [];
+    currentSHA = '';
+    renderEditor();
+    updateFileInfo();
+    document.getElementById('file-subject').value = '';
+    savedSubject = '';
+    updateSubjectStatus();
+  } else {
+    const sel = document.getElementById('file-select').value;
+    if (sel) {
+      currentFile = sel;
+      loadSubject(sel);
+    }
+  }
+  updateSaveBtn();
+}
+
+async function forceReloadFromGitHub() {
+  if (!currentFile) { toast('Pehle file select karo!','warn'); return; }
+  if (dirty && !confirm('Aapke unsaved local changes discard ho jaayenge. Firebase se fresh copy load karein?')) return;
+  await loadExistingFile(currentFile);
+}
+
+async function loadExistingFile(filename) {
+  if (!getToken()) { toast('Pehle login karo!','warn'); return; }
+  document.getElementById('file-info').textContent = '⏳ Loading...';
+  try {
+    const r = await ghFetch(`contents/questions/${filename}`);
+    if (r.status===404) {
+      existingQ=[]; currentSHA=''; savedSnapshot='[]'; dirty=false;
+      document.getElementById('file-info').textContent = '⚠️ Naya file banega';
+      renderEditor(); return;
+    }
+    if (!r.ok) { toast('Load error!','error'); return; }
+    const data = await r.json();
+    currentSHA = data.sha;
+    existingQ = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));
+    savedSnapshot = JSON.stringify(existingQ);
+    dirty = false;
+    updateFileInfo();
+    renderEditor();
+    toast(`${existingQ.length} questions load ho gaye!`,'success');
+  } catch(e) {
+    toast('Parse error: '+e.message,'error');
+  }
+}
+
+function updateFileInfo() {
+  const fi = document.getElementById('file-info');
+  if (existingQ.length>0) fi.textContent = `📌 ${existingQ.length} questions — ${currentFile}`;
+  else fi.textContent = '';
+}
+
+// ═══════════════════════════════════════════
+//  MODE
+// ═══════════════════════════════════════════
+function setMode(m) {
+  currentMode=m;
+  document.getElementById('tab-append').classList.toggle('active',m==='append');
+  document.getElementById('tab-replace').classList.toggle('active',m==='replace');
+  document.getElementById('merge-info').style.display = m==='replace'?'block':'none';
+}
+
+// ═══════════════════════════════════════════
+//  JSON FILE UPLOAD (button-click or drag-drop)
+// ═══════════════════════════════════════════
+function loadJsonFile(file) {
+  if (!file) return;
+  if (!/\.json$/i.test(file.name)) { toast('Sirf .json file allowed hai!','error'); return; }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    document.getElementById('json-input').value = ev.target.result;
+    document.getElementById('json-file-name').textContent = `✅ ${file.name} (${(file.size/1024).toFixed(1)} KB) loaded`;
+    toast(`📁 ${file.name} load ho gayi!`,'success');
+    parseAndPreview();
+  };
+  reader.onerror = () => toast('File padhne mein error aaya!','error');
+  reader.readAsText(file);
+}
+function handleJsonFileUpload(e) {
+  loadJsonFile(e.target.files[0]);
+  e.target.value = ''; // allow re-selecting same file later
+}
+function handleJsonFileDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = 'var(--border)';
+  loadJsonFile(e.dataTransfer.files[0]);
+}
+
+// ═══════════════════════════════════════════
+//  JSON FULL-SCREEN EXPAND EDITOR
+// ═══════════════════════════════════════════
+function openJsonExpand() {
+  const src = document.getElementById('json-input');
+  const exp = document.getElementById('json-input-expanded');
+  exp.value = src.value;
+  document.getElementById('json-expand-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => exp.focus(), 50);
+}
+function closeJsonExpand(apply) {
+  if (apply) {
+    document.getElementById('json-input').value = document.getElementById('json-input-expanded').value;
+    toast('✅ JSON apply ho gaya!','success');
+  }
+  document.getElementById('json-expand-overlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// ═══════════════════════════════════════════
+//  PARSE & PREVIEW
+// ═══════════════════════════════════════════
+let pendingArr = null;
+
+function parseAndPreview() {
+  const raw = document.getElementById('json-input').value.trim();
+  if (!raw) { toast('JSON paste karo!','warn'); return; }
+  let arr;
+  try {
+    arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) throw new Error('Array chahiye');
+  } catch(e) {
+    toast('JSON invalid: '+e.message,'error'); return;
+  }
+
+  pendingArr = arr;
+
+  const pvList = document.getElementById('preview-cards-list');
+  pvList.innerHTML = '';
+  const maxN = existingQ.length>0 ? Math.max(...existingQ.map(q=>q.num||0)) : 0;
+
+  arr.forEach((q,i) => {
+    const dispNum = currentMode==='append' ? maxN+i+1 : q.num||i+1;
+    const letters = ['a','b','c','d','e','f'];
+    const card = document.createElement('div');
+    card.className = 'pv-card';
+    card.innerHTML = `
+      <div class="pv-num">Q${dispNum} <span style="color:var(--success);font-size:11px;font-weight:700">● NEW</span>
+        ${q.ans ? `<span style="margin-left:8px;color:var(--success);font-size:11px">✓ Ans: ${q.ans.toUpperCase()}</span>` : '<span style="margin-left:8px;color:var(--error);font-size:11px">⚠️ Answer set nahi</span>'}
+      </div>
+      <div class="pv-text">${escH(q.text||'')}</div>
+      ${q.hindi?`<div class="pv-hindi">${escH(q.hindi)}</div>`:''}
+      <div class="pv-opts">${(q.opts||[]).map((o,oi)=>{
+        const isAns = q.ans && q.ans===letters[oi];
+        return `<span class="pv-opt" style="${isAns?'background:rgba(76,175,130,.2);border-color:var(--success);color:var(--success);font-weight:700':''}">${isAns?'✓ ':''}${escH(o)}</span>`;
+      }).join('')}</div>
+    `;
+    pvList.appendChild(card);
+  });
+
+  const cbar = document.getElementById('preview-confirm-bar');
+  cbar.style.display = 'flex';
+  const modeLabel = currentMode==='append'
+    ? `${arr.length} naye questions — ${existingQ.length} existing ke baad add honge (Total: ${existingQ.length+arr.length})`
+    : `${arr.length} questions — poora file replace ho jaayega`;
+  document.getElementById('preview-count-label').textContent = modeLabel;
+
+  switchRTab('preview');
+  toast(`${arr.length} questions preview mein — check karo!`,'info');
+}
+
+function confirmAndAdd() {
+  if (!pendingArr) return;
+  if (currentMode==='replace') {
+    existingQ = pendingArr.map(q=>({...q, _new:true}));
+  } else {
+    const maxN = existingQ.length>0 ? Math.max(...existingQ.map(q=>q.num||0)) : 0;
+    pendingArr.forEach((q,i) => { q.num = maxN+i+1; q._new=true; });
+    existingQ = [...existingQ, ...pendingArr];
+  }
+  pendingArr = null;
+  document.getElementById('json-input').value = '';
+  document.getElementById('preview-confirm-bar').style.display = 'none';
+  document.getElementById('preview-cards-list').innerHTML = '';
+  computeDirty();
+  switchRTab('editor');
+  renderEditor();
+  updateSaveBtn();
+  toast('Questions editor mein add ho gaye! Ab Save karo.','success');
+}
+
+function cancelPreview() {
+  pendingArr = null;
+  document.getElementById('preview-confirm-bar').style.display = 'none';
+  document.getElementById('preview-cards-list').innerHTML = '';
+  switchRTab('editor');
+  toast('Preview cancel kiya.','warn');
+}
+
+// ═══════════════════════════════════════════
+//  RIGHT PANEL TAB SWITCH
+// ═══════════════════════════════════════════
+function switchRTab(tab) {
+  activeRTab = tab;
+  document.getElementById('rtab-editor').classList.toggle('active', tab==='editor');
+  document.getElementById('rtab-preview').classList.toggle('active', tab==='preview');
+  document.getElementById('rtab-flagged').classList.toggle('active', tab==='flagged');
+  document.getElementById('q-editor-list').style.display = tab==='editor' ? 'block' : 'none';
+  document.getElementById('q-preview-panel').style.display = tab==='preview' ? 'block' : 'none';
+  const flagPanel = document.getElementById('q-flagged-panel');
+  if (flagPanel) { flagPanel.classList.toggle('show', tab==='flagged'); }
+  document.querySelectorAll('.rp-header .btn').forEach(b => b.style.display = tab==='editor'?'':'none');
+  updateToolbarVisibility();
+
+  if (tab==='flagged') {
+    loadFlaggedQuestions();
+  }
+
+  if (tab==='preview' && !pendingArr && existingQ.length>0) {
+    const pvList = document.getElementById('preview-cards-list');
+    const cbar = document.getElementById('preview-confirm-bar');
+    cbar.style.display = 'none';
+    pvList.innerHTML = '';
+    const letters = ['a','b','c','d','e','f'];
+    existingQ.forEach(q => {
+      const card = document.createElement('div');
+      card.className = 'pv-card';
+      card.innerHTML = `
+        <div class="pv-num">Q${q.num}
+          ${q.ans ? `<span style="margin-left:8px;color:var(--success);font-size:11px">✓ ${q.ans.toUpperCase()}</span>` : '<span style="margin-left:8px;color:var(--error);font-size:11px">⚠️ Ans nahi</span>'}
+        </div>
+        ${q.hindi ? `<div class="pv-hindi">${escH(q.hindi)}</div>` : ''}
+        ${q.text  ? `<div class="pv-text">${escH(q.text)}</div>`   : ''}
+        <div class="pv-opts">${(q.opts||[]).map((o,oi)=>{
+          const isAns = q.ans && q.ans===letters[oi];
+          return `<span class="pv-opt" style="${isAns?'background:rgba(76,175,130,.2);border-color:var(--success);color:var(--success);font-weight:700':''}">${isAns?'✓ ':''}${escH(o)}</span>`;
+        }).join('')}</div>
+      `;
+      pvList.appendChild(card);
+    });
+  } else if (tab==='preview' && existingQ.length===0 && !pendingArr) {
+    document.getElementById('preview-cards-list').innerHTML = '<div class="empty-state"><div class="icon">📂</div><p>Koi questions nahi hain abhi</p></div>';
+    document.getElementById('preview-confirm-bar').style.display = 'none';
+  }
+  if (tab==='preview' && window.MathJax && MathJax.typesetPromise) {
+    setTimeout(() => MathJax.typesetPromise([document.getElementById('preview-cards-list')]).catch(()=>{}), 100);
+  }
+}
+
+function clearInput() {
+  document.getElementById('json-input').value='';
+  document.getElementById('json-file-name').textContent = '';
+  document.getElementById('json-file-input').value = '';
+  pendingArr = null;
+}
+
+// ═══════════════════════════════════════════
+//  RENDER EDITOR
+// ═══════════════════════════════════════════
+function renderEditor() {
+  const list = document.getElementById('q-editor-list');
+  const title = document.getElementById('rp-title');
+
+  title.textContent = currentFile || 'Questions Editor';
+  updateSaveBtn();
+  saveDraft();
+  updateToolbarVisibility();
+
+  if (existingQ.length===0) {
+    updateTotalBadge(0);
+    updateMissingBtn();
+    list.innerHTML = `<div class="empty-state"><div class="icon">📂</div><p>File select karo ya JSON paste karke Add karo</p></div>`;
+    return;
+  }
+
+  // agar "missing only" filter on hai but ab koi answer missing bacha hi nahi — auto-clear
+  if (filterMissingOnly && !existingQ.some(q=>!q.ans)) {
+    filterMissingOnly = false;
+  }
+  updateMissingBtn();
+
+  let entries = existingQ.map((q,idx)=>({q,idx}));
+  if (filterMissingOnly) entries = entries.filter(e=>!e.q.ans);
+  const query = searchQuery.trim().toLowerCase();
+  if (query) entries = entries.filter(e=>questionMatchesSearch(e.q, query));
+  const filtering = !!query || filterMissingOnly;
+  updateTotalBadge(entries.length);
+
+  if (filtering && entries.length===0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Koi question match nahi hua<br>search clear karo ya kuch aur try karo</p></div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  if (!filtering) {
+    entries.forEach(({q,idx}) => {
+      list.appendChild(makeInsertZone(idx));
+      list.appendChild(makeQCard(q, idx, false));
+    });
+    list.appendChild(makeInsertZone(existingQ.length));
+  } else {
+    entries.forEach(({q,idx}) => list.appendChild(makeQCard(q, idx, true)));
+  }
+
+  if (window.MathJax && MathJax.typesetPromise) {
+    setTimeout(() => MathJax.typesetPromise([list]).catch(()=>{}), 100);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  SEARCH / "ANSWER MISSING" FILTER
+// ═══════════════════════════════════════════
+function questionMatchesSearch(q, query) {
+  if (String(q.num).toLowerCase().includes(query)) return true;
+  if ((q.text||'').toLowerCase().includes(query)) return true;
+  if ((q.hindi||'').toLowerCase().includes(query)) return true;
+  const digits = query.replace(/[^0-9]/g,'');
+  if (digits && String(q.num)===digits) return true;
+  return false;
+}
+
+function onSearchInput(val) {
+  searchQuery = val;
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
+  renderEditor();
+}
+
+function clearSearch() {
+  searchQuery = '';
+  const input = document.getElementById('q-search');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderEditor();
+}
+
+function toggleMissingFilter() {
+  const missingCount = existingQ.filter(q=>!q.ans).length;
+  if (missingCount===0 && !filterMissingOnly) return;
+  filterMissingOnly = !filterMissingOnly;
+  renderEditor();
+}
+
+function updateMissingBtn() {
+  const btn = document.getElementById('missing-ans-btn');
+  if (!btn) return;
+  const missingCount = existingQ.filter(q=>!q.ans).length;
+  if (missingCount===0 && !filterMissingOnly) { btn.style.display = 'none'; return; }
+  btn.style.display = 'inline-flex';
+  if (filterMissingOnly) {
+    btn.classList.add('active-filter');
+    btn.textContent = '✕ Sab questions dikhao';
+  } else {
+    btn.classList.remove('active-filter');
+    btn.textContent = `⚠️ ${missingCount} answer${missingCount>1?'s':''} missing — dikhao`;
+  }
+}
+
+function updateTotalBadge(visibleCount) {
+  const tot = document.getElementById('q-total');
+  if (!tot) return;
+  lastVisibleCount = visibleCount;
+  const impCount = existingQ.filter(q=>q.imp).length;
+  const filtering = !!searchQuery.trim() || filterMissingOnly;
+  let txt = filtering ? `${visibleCount} / ${existingQ.length} questions` : `${existingQ.length} questions`;
+  if (impCount>0) txt += ` · ⭐ ${impCount}`;
+  tot.textContent = txt;
+}
+
+function updateToolbarVisibility() {
+  const tb = document.getElementById('rp-toolbar');
+  if (!tb) return;
+  tb.style.display = (activeRTab==='editor' && existingQ.length>0) ? 'flex' : 'none';
+}
+
+function makeInsertZone(afterIdx) {
+  const div = document.createElement('div');
+  div.className = 'insert-zone';
+  div.innerHTML = `<button class="insert-btn" onclick="insertQuestionAt(${afterIdx})">＋ Yahan naya question daalo</button>`;
+  return div;
+}
+
+function makeQCard(q, idx, filtering) {
+  const card = document.createElement('div');
+  card.className = 'qe-card' + (q._new?' new-q':'');
+  card.dataset.idx = idx;
+
+  if (!filtering) {
+    card.setAttribute('draggable','true');
+    card.addEventListener('dragstart', e => { dragSrcIdx=idx; card.style.opacity='.4'; });
+    card.addEventListener('dragend',   e => { card.style.opacity='1'; document.querySelectorAll('.qe-card').forEach(c=>c.classList.remove('drag-over')); });
+    card.addEventListener('dragover',  e => { e.preventDefault(); card.classList.add('drag-over'); });
+    card.addEventListener('dragleave', e => card.classList.remove('drag-over'));
+    card.addEventListener('drop',      e => { e.preventDefault(); card.classList.remove('drag-over'); if(dragSrcIdx!==null && dragSrcIdx!==idx) moveQuestion(dragSrcIdx,idx); });
+  }
+
+  const preview = (q.text||q.hindi||'(khali)').substring(0,70);
+  const letters = ['a','b','c','d','e','f'];
+
+  card.innerHTML = `
+    <div class="qe-head" onclick="toggleCard(${idx})">
+      <span class="drag-handle" title="Drag to reorder" onclick="event.stopPropagation()" style="${filtering?'visibility:hidden':''}">⠿</span>
+      <span class="qe-num">Q${q.num}</span>
+      <span class="qe-preview">${escH(preview)}</span>
+      ${q._new?'<span class="qe-badge qe-badge-new">NEW</span>':''}
+      ${q.ans?`<span class="qe-badge qe-badge-ans" style="background:rgba(76,175,130,.15);color:var(--success);border:1px solid rgba(76,175,130,.3)">✓${q.ans.toUpperCase()}</span>`:'<span class="qe-badge qe-badge-ans" style="background:rgba(255,82,82,.1);color:var(--error);border:1px solid rgba(255,82,82,.3)">!Ans</span>'}
+      ${q.imp?'<span class="qe-badge qe-badge-imp" title="Important">⭐</span>':''}
+      <div class="qe-head-btns" onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-xs" onclick="toggleMiniPreview(${idx})" title="Preview dekho">👁️</button>
+        <button class="btn btn-outline btn-xs" onclick="duplicateQ(${idx})" title="Duplicate karo">📋</button>
+        <button class="btn btn-outline btn-xs" onclick="toggleCard(${idx})">✏️</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteQ(${idx})" title="Delete">🗑️</button>
+      </div>
+    </div>
+
+    <div class="qe-mini-preview" id="qmini-${idx}">
+      ${q.hindi?`<div class="pv-hindi">${escH(q.hindi)}</div>`:''}
+      ${q.text?`<div class="pv-text">${escH(q.text)}</div>`:''}
+      <div class="pv-opts">${(q.opts||[]).map((o,oi)=>{
+        const isAns = q.ans && q.ans===letters[oi];
+        return `<span class="pv-opt" style="${isAns?'background:rgba(76,175,130,.2);border-color:var(--success);color:var(--success);font-weight:700':''}">${isAns?'✓ ':''}${escH(o)}</span>`;
+      }).join('')}</div>
+    </div>
+
+    <div class="qe-body" id="qbody-${idx}">
+      <div class="field-group">
+        <label>प्रश्न (English)</label>
+        <textarea rows="3" id="qtext-${idx}" onchange="updateQ(${idx},'text',this.value)">${escH(q.text||'')}</textarea>
+      </div>
+      <div class="field-group">
+        <label>प्रश्न (Hindi)</label>
+        <textarea rows="2" id="qhindi-${idx}" onchange="updateQ(${idx},'hindi',this.value)">${escH(q.hindi||'')}</textarea>
+      </div>
+      <div class="field-group">
+        <label>Options <span style="color:var(--success);font-size:11px">(✓ = sahi jawab)</span></label>
+        <div id="qopts-${idx}">
+          ${(q.opts||[]).map((o,oi)=>{
+            const letter = letters[oi];
+            const isAns = q.ans === letter;
+            return `<div class="opt-row">
+              <label class="opt-radio-lbl" title="Sahi jawab mark karo">
+                <input type="radio" name="ans-${idx}" value="${letter}" ${isAns?'checked':''} onchange="updateQ(${idx},'ans','${letter}')">
+              </label>
+              <input type="text" value="${escH(o)}" onchange="updateOpt(${idx},${oi},this.value)">
+              <button class="btn btn-danger btn-xs" onclick="deleteOpt(${idx},${oi})">✕</button>
+            </div>`;
+          }).join('')}
+        </div>
+        <button class="btn btn-outline btn-xs" style="margin-top:6px" onclick="addOpt(${idx})">＋ Option</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;padding:10px;background:var(--bg);border-radius:7px;border:1px solid var(--border)">
+        <label style="margin:0">Q No:</label>
+        <input type="text" style="width:70px" value="${q.num}" onchange="updateQ(${idx},'num',parseInt(this.value)||${idx+1})">
+        <button class="btn btn-outline btn-xs" onclick="moveUp(${idx})" ${(idx===0||filtering)?'disabled':''} ${filtering?'title="Search/filter clear karo pehle"':''}>↑</button>
+        <button class="btn btn-outline btn-xs" onclick="moveDown(${idx})" ${(idx===existingQ.length-1||filtering)?'disabled':''} ${filtering?'title="Search/filter clear karo pehle"':''}>↓</button>
+        <label style="margin:0 0 0 8px;cursor:pointer;display:flex;align-items:center;gap:4px;color:${q.imp?'#f5a623':'var(--muted)'}">
+          <input type="checkbox" ${q.imp?'checked':''} onchange="updateQ(${idx},'imp',this.checked)" style="width:14px;height:14px;accent-color:#f5a623">
+          ⭐
+        </label>
+        <select style="width:auto;font-size:11px;padding:4px 6px" onchange="updateQ(${idx},'freq',parseInt(this.value))" ${!q.imp?'disabled':''} id="freq-${idx}">
+          <option value="1" ${q.freq===1?'selected':''}>1 din</option>
+          <option value="2" ${(!q.freq||q.freq===2)?'selected':''}>2 din</option>
+          <option value="3" ${q.freq===3?'selected':''}>3 din</option>
+          <option value="7" ${q.freq===7?'selected':''}>7 din</option>
+        </select>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ═══════════════════════════════════════════
+//  EDITOR ACTIONS
+// ═══════════════════════════════════════════
+function toggleMiniPreview(idx) {
+  const mini = document.getElementById('qmini-'+idx);
+  const isOpen = mini.classList.toggle('open');
+  if (isOpen) refreshMiniPreview(idx);
+  if (isOpen && window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([mini]).catch(()=>{});
+  }
+}
+
+// mini-preview (👁️) ka HTML dobara existingQ se banao — taaki edits turant reflect ho
+function refreshMiniPreview(idx) {
+  const mini = document.getElementById('qmini-'+idx);
+  if (!mini) return;
+  const q = existingQ[idx];
+  const letters = ['a','b','c','d','e','f'];
+  mini.innerHTML = `
+    ${q.hindi?`<div class="pv-hindi">${escH(q.hindi)}</div>`:''}
+    ${q.text?`<div class="pv-text">${escH(q.text)}</div>`:''}
+    <div class="pv-opts">${(q.opts||[]).map((o,oi)=>{
+      const isAns = q.ans && q.ans===letters[oi];
+      return `<span class="pv-opt" style="${isAns?'background:rgba(76,175,130,.2);border-color:var(--success);color:var(--success);font-weight:700':''}">${isAns?'✓ ':''}${escH(o)}</span>`;
+    }).join('')}</div>
+  `;
+}
+
+function toggleCard(idx) {
+  const body = document.getElementById('qbody-'+idx);
+  const card = body.closest('.qe-card');
+  const isOpen = body.classList.toggle('open');
+  card.classList.toggle('editing', isOpen);
+  if (isOpen && window.MathJax && MathJax.typesetPromise) {
+    setTimeout(() => MathJax.typesetPromise([body]).catch(()=>{}), 50);
+  }
+}
+
+function expandAll()   { document.querySelectorAll('.qe-body').forEach(b=>{ b.classList.add('open'); b.closest('.qe-card').classList.add('editing'); }); }
+function collapseAll() { document.querySelectorAll('.qe-body').forEach(b=>{ b.classList.remove('open'); b.closest('.qe-card').classList.remove('editing'); }); }
+
+function updateQ(idx, field, val) {
+  existingQ[idx][field] = val;
+  computeDirty();
+  updateSaveBtn();
+  saveDraft();
+  const card = document.querySelector(`.qe-card[data-idx="${idx}"]`);
+  if (card) {
+    const prev = card.querySelector('.qe-preview');
+    if (prev) prev.textContent = (existingQ[idx].text||existingQ[idx].hindi||'(khali)').substring(0,70);
+    const numEl = card.querySelector('.qe-num');
+    if (numEl && field==='num') numEl.textContent = 'Q'+val;
+    if (field==='imp') {
+      const freqSel = document.getElementById('freq-'+idx);
+      if (freqSel) freqSel.disabled = !val;
+      updateTotalBadge(lastVisibleCount);
+      const head = card.querySelector('.qe-head');
+      let impBadge = head.querySelector('.qe-badge-imp');
+      if (val && !impBadge) {
+        impBadge = document.createElement('span');
+        impBadge.className = 'qe-badge qe-badge-imp';
+        impBadge.title = 'Important';
+        impBadge.textContent = '⭐';
+        head.insertBefore(impBadge, head.querySelector('.qe-head-btns'));
+      } else if (!val && impBadge) {
+        impBadge.remove();
+      }
+    }
+    if (field==='ans') {
+      const badge = card.querySelector('.qe-head .qe-badge-ans');
+      if (badge) {
+        if (val) {
+          badge.textContent = '✓'+String(val).toUpperCase();
+          badge.style.cssText = 'background:rgba(76,175,130,.15);color:var(--success);border:1px solid rgba(76,175,130,.3)';
+        } else {
+          badge.textContent = '!Ans';
+          badge.style.cssText = 'background:rgba(255,82,82,.1);color:var(--error);border:1px solid rgba(255,82,82,.3)';
+        }
+      }
+      updateMissingBtn();
+    }
+  }
+  refreshMiniPreview(idx);
+}
+
+// Subject Local Storage Sync & Status Update
+function saveSubjectLocally() {
+  const fn = getFilename();
+  if (!fn) return;
+  const subj = document.getElementById('file-subject').value;
+  const map = JSON.parse(localStorage.getItem('file_subjects')||'{}');
+  if (subj) map[fn] = subj; else delete map[fn];
+  localStorage.setItem('file_subjects', JSON.stringify(map));
+  if (existingQ.length > 0) { computeDirty(); updateSaveBtn(); saveDraft(); }
+  updateSubjectStatus();
+}
+
+function loadSubject(filename) {
+  const map = JSON.parse(localStorage.getItem('file_subjects')||'{}');
+  const subj = map[filename] || '';
+  document.getElementById('file-subject').value = subj;
+  savedSubject = subj;
+  updateSubjectStatus();
+}
+
+function updateSubjectStatus() {
+  const el = document.getElementById('subject-status');
+  if (!el) return;
+  const cur = document.getElementById('file-subject').value;
+  if (!cur) { el.textContent = ''; return; }
+  if (cur === savedSubject) {
+    el.innerHTML = '✅ Firebase pe saved hai';
+    el.style.color = 'var(--success)';
+  } else {
+    el.innerHTML = '⚠️ Not saved — 💾 dabao ya neeche Save karo';
+    el.style.color = 'var(--warn)';
+  }
+}
+
+async function saveSubjectOnly() {
+  const fn = getFilename();
+  if (!fn) { toast('File select karo ya naam dalo!','warn'); return; }
+  if (!getToken()) { toast('Pehle login karo!','error'); return; }
+  const subj = document.getElementById('file-subject').value;
+
+  try {
+    let metaSHA = '';
+    let existingMeta = {};
+    const mr = await ghFetch(`contents/questions/meta.json`);
+    if (mr.ok) {
+      const md = await mr.json();
+      metaSHA = md.sha;
+      existingMeta = JSON.parse(decodeURIComponent(escape(atob(md.content.replace(/\n/g,'')))));
+    }
+    if (subj) existingMeta[fn] = subj;
+    else delete existingMeta[fn];
+
+    const metaContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingMeta, null, 2))));
+    const body = {message:`Update meta.json — ${fn}:${subj||'?'}`, content:metaContent, branch:'main'};
+    if (metaSHA) body.sha = metaSHA;
+
+    const r = await ghFetch(`contents/questions/meta.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) {
+      savedSubject = subj;
+      updateSubjectStatus();
+      toast('✅ Subject Firebase pe save ho gaya!','success');
+    } else {
+      const data = await r.json();
+      toast('❌ '+(data.message||'Save error'),'error');
+    }
+  } catch(e) {
+    toast('Network error: '+e.message,'error');
+  }
+}
+
+function updateOpt(idx, oi, val) {
+  existingQ[idx].opts[oi] = val;
+  computeDirty(); updateSaveBtn();
+  saveDraft();
+  refreshMiniPreview(idx);
+}
+
+function deleteOpt(idx, oi) {
+  existingQ[idx].opts.splice(oi,1);
+  computeDirty();
+  const letters = ['a','b','c','d','e','f'];
+  const q = existingQ[idx];
+  const optsDiv = document.getElementById('qopts-'+idx);
+  optsDiv.innerHTML = q.opts.map((o,i)=>{
+    const letter = letters[i];
+    const isAns = q.ans === letter;
+    return `<div class="opt-row">
+      <label class="opt-radio-lbl" title="Sahi jawab mark karo">
+        <input type="radio" name="ans-${idx}" value="${letter}" ${isAns?'checked':''} onchange="updateQ(${idx},'ans','${letter}')">
+      </label>
+      <input type="text" value="${escH(o)}" onchange="updateOpt(${idx},${i},this.value)">
+      <button class="btn btn-danger btn-xs" onclick="deleteOpt(${idx},${i})">✕</button>
+    </div>`;
+  }).join('');
+  updateSaveBtn();
+  saveDraft();
+  refreshMiniPreview(idx);
+}
+
+function addOpt(idx) {
+  if (!existingQ[idx].opts) existingQ[idx].opts=[];
+  const letters = ['a','b','c','d','e','f'];
+  existingQ[idx].opts.push('');
+  computeDirty();
+  const q = existingQ[idx];
+  const optsDiv = document.getElementById('qopts-'+idx);
+  optsDiv.innerHTML = q.opts.map((o,i)=>{
+    const letter = letters[i];
+    const isAns = q.ans === letter;
+    return `<div class="opt-row">
+      <label class="opt-radio-lbl" title="Sahi jawab mark karo">
+        <input type="radio" name="ans-${idx}" value="${letter}" ${isAns?'checked':''} onchange="updateQ(${idx},'ans','${letter}')">
+      </label>
+      <input type="text" value="${escH(o)}" onchange="updateOpt(${idx},${i},this.value)">
+      <button class="btn btn-danger btn-xs" onclick="deleteOpt(${idx},${i})">✕</button>
+    </div>`;
+  }).join('');
+  updateSaveBtn();
+  saveDraft();
+  refreshMiniPreview(idx);
+}
+
+function deleteQ(idx) {
+  if (!confirm(`Q${existingQ[idx].num} delete karna hai?`)) return;
+  existingQ.splice(idx,1);
+  computeDirty();
+  renderEditor();
+}
+
+function insertQuestionAt(idx) {
+  const newQ = {num: 0, text:'', hindi:'', opts:['(a) ','(b) ','(c) ','(d) '], _new:true};
+  existingQ.splice(idx, 0, newQ);
+  existingQ.forEach((q, i) => { q.num = i + 1; });
+  computeDirty();
+  renderEditor();
+  setTimeout(() => { toggleCard(idx); document.getElementById('qtext-'+idx)?.focus(); }, 50);
+}
+
+function duplicateQ(idx) {
+  const copy = JSON.parse(JSON.stringify(existingQ[idx]));
+  copy._new = true;
+  existingQ.splice(idx+1, 0, copy);
+  existingQ.forEach((q,i) => { q.num = i+1; });
+  computeDirty();
+  renderEditor();
+  toast(`Q${copy.num} duplicate ho gaya — ab edit karke save karo!`,'success');
+  setTimeout(() => { toggleCard(idx+1); document.getElementById('qtext-'+(idx+1))?.focus(); }, 50);
+}
+
+function moveUp(idx) {
+  if(idx===0) return;
+  [existingQ[idx-1],existingQ[idx]]=[existingQ[idx],existingQ[idx-1]];
+  computeDirty(); renderEditor();
+}
+function moveDown(idx) {
+  if(idx>=existingQ.length-1) return;
+  [existingQ[idx],existingQ[idx+1]]=[existingQ[idx+1],existingQ[idx]];
+  computeDirty(); renderEditor();
+}
+function moveQuestion(fromIdx, toIdx) {
+  const item = existingQ.splice(fromIdx,1)[0];
+  existingQ.splice(toIdx,0,item);
+  computeDirty(); renderEditor();
+}
+
+function renumberAll() {
+  existingQ.forEach((q,i)=>q.num=i+1);
+  computeDirty(); renderEditor();
+  toast('Renumber ho gaya!','success');
+}
+
+// Real dirty-check: compares CURRENT content/subject against the last
+// GitHub-loaded/saved baseline — so undo-ing an edit correctly clears
+// the "unsaved changes" state instead of dirty staying stuck true.
+function computeDirty() {
+  const contentChanged = JSON.stringify(existingQ) !== savedSnapshot;
+  const subjSel = document.getElementById('file-subject');
+  const subjectChanged = existingQ.length > 0 && !!subjSel && subjSel.value !== savedSubject;
+  dirty = contentChanged || subjectChanged;
+}
+
+function updateSaveBtn() {
+  const btn = document.getElementById('save-btn');
+  const info = document.getElementById('save-info');
+  const fn = getFilename();
+
+  const box = document.getElementById('save-target-box');
+  const nameEl = document.getElementById('save-target-name');
+  if (fn) {
+    const newF = document.getElementById('new-filename').value.trim();
+    const selF = document.getElementById('file-select').value;
+    box.style.display = 'block';
+    if (newF && selF) {
+      box.style.borderColor = 'var(--warn)';
+      nameEl.style.color = 'var(--warn)';
+      nameEl.textContent = `⚠️ ${newF} (New file — "${selF}" ignore hoga)`;
+    } else {
+      box.style.borderColor = 'var(--border)';
+      nameEl.style.color = 'var(--accent)';
+      nameEl.textContent = `📄 questions/${fn}`;
+    }
+  } else {
+    box.style.display = 'none';
+  }
+
+  btn.disabled = !dirty || existingQ.length===0 || !fn;
+  info.textContent = dirty ? `⚠️ ${existingQ.length} questions — unsaved changes` : '';
+}
+
+async function saveToGitHub() {
+  const filename = getFilename();
+  if (!filename) { toast('File naam select karo!','error'); return; }
+  if (existingQ.length===0) { toast('Questions hain hi nahi!','error'); return; }
+  if (!getToken()) { toast('Pehle login karo!','error'); return; }
+
+  const toSave = existingQ.map(q=>{ const {_new,...rest}=q; return rest; });
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(toSave, null, 2))));
+  const btn = document.getElementById('save-btn');
+  btn.innerHTML='<span class="spinner"></span> Saving...';
+  btn.disabled=true;
+
+  const body = {
+    message:`Update ${filename} — ${toSave.length} questions`,
+    content, branch:'main'
+  };
+  if (currentSHA) body.sha = currentSHA;
+
+  try {
+    const r = await ghFetch(`contents/questions/${filename}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (r.ok) {
+      currentSHA = data.content?.sha||'';
+      existingQ = toSave;
+      savedSnapshot = JSON.stringify(existingQ);
+      dirty = false;
+      renderEditor();
+      toast(`✅ Saved! ${toSave.length} questions in ${filename}`,'success',5000);
+      btn.innerHTML='✅ Saved!';
+      document.getElementById('save-info').textContent='';
+      await saveMetaJson(filename);
+      await saveImportantJson(filename);
+      setTimeout(()=>{ btn.innerHTML='⬆️ Firebase pe Save karo'; }, 2500);
+    } else {
+      toast('❌ '+data.message,'error',6000);
+      btn.innerHTML='⬆️ Firebase pe Save karo'; btn.disabled=false;
+    }
+  } catch(e) {
+    toast('Network error: '+e.message,'error');
+    btn.innerHTML='⬆️ Firebase pe Save karo'; btn.disabled=false;
+  }
+}
+
+async function saveMetaJson(savedFilename) {
+  try {
+    const subj = document.getElementById('file-subject').value;
+    const map = JSON.parse(localStorage.getItem('file_subjects')||'{}');
+    if (subj) map[savedFilename] = subj;
+    localStorage.setItem('file_subjects', JSON.stringify(map));
+
+    let metaSHA = '';
+    let existingMeta = {};
+    try {
+      const mr = await ghFetch(`contents/questions/meta.json`);
+      if (mr.ok) {
+        const md = await mr.json();
+        metaSHA = md.sha;
+        existingMeta = JSON.parse(decodeURIComponent(escape(atob(md.content.replace(/\n/g,'')))));
+      }
+    } catch(e) {}
+
+    if (subj) existingMeta[savedFilename] = subj;
+    const metaContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingMeta, null, 2))));
+    const metaBody = {message:`Update meta.json — ${savedFilename}:${subj||'?'}`, content:metaContent, branch:'main'};
+    if (metaSHA) metaBody.sha = metaSHA;
+    const mres = await ghFetch(`contents/questions/meta.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metaBody),
+    });
+    if (mres.ok) { savedSubject = subj; updateSubjectStatus(); }
+  } catch(e) {
+    console.warn('meta.json save error:', e);
+  }
+}
+
+async function saveImportantJson(filename) {
+  try {
+    const subject = document.getElementById('file-subject').value || 'math';
+    const chapter = filename.replace('.json','').split('-')
+      .map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+
+    let impSHA = '';
+    let existing = [];
+    try {
+      const r = await ghFetch(`contents/questions/important-questions.json`);
+      if (r.ok) {
+        const d = await r.json();
+        impSHA = d.sha;
+        existing = JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\n/g,'')))));
+      }
+    } catch(e) {}
+
+    existing = existing.filter(q => q._file !== filename);
+
+    const newImp = existingQ
+      .filter(q => q.imp)
+      .map(q => { const {_new,...rest} = q; return {...rest, _file:filename, _chapter:chapter, _subject:subject}; });
+
+    const final = [...existing, ...newImp];
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(final, null, 2))));
+    const body = {message:`Update important-questions.json — ${filename}`, content, branch:'main'};
+    if (impSHA) body.sha = impSHA;
+
+    await ghFetch(`contents/questions/important-questions.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    toast(`⭐ ${newImp.length} important questions updated!`, 'info');
+  } catch(e) {
+    console.warn('important-questions.json error:', e);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  FLAGGED QUESTIONS — Load / Approve / Dismiss
+// ═══════════════════════════════════════════
+async function loadFlaggedQuestions() {
+  if (!getToken()) return;
+  try {
+    const r = await ghFetch('flagged');
+    if (!r.ok) { console.warn('Flagged load error'); return; }
+    flaggedItems = await r.json();
+    renderFlaggedPanel();
+    updateFlagBadge();
+  } catch(e) {
+    console.warn('Flagged fetch error:', e);
+  }
+}
+
+function updateFlagBadge() {
+  const badge = document.getElementById('flag-tab-badge');
+  const countBadge = document.getElementById('flag-count-badge');
+  if (badge) {
+    if (flaggedItems.length > 0) {
+      badge.textContent = flaggedItems.length;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  if (countBadge) {
+    countBadge.textContent = flaggedItems.length + ' pending';
+  }
+}
+
+function renderFlaggedPanel() {
+  const list = document.getElementById('flagged-list');
+  if (!list) return;
+
+  if (flaggedItems.length === 0) {
+    list.innerHTML = `<div class="flag-empty">
+      <div class="icon">✅</div>
+      <p>Koi flagged question nahi hai!<br>Sab clear hai 🎉</p>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  flaggedItems.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'flag-card';
+    card.id = 'flag-card-' + item.id;
+    const timeAgo = getTimeAgo(item.ts);
+    card.innerHTML = `
+      <div class="flag-icon">🚩</div>
+      <div class="flag-info">
+        <div class="flag-file">📄 ${escH(item.file || '?')}</div>
+        <div class="flag-qnum">Question #<strong>${item.num || '?'}</strong></div>
+        <div class="flag-time">🕐 ${timeAgo}</div>
+      </div>
+      <div class="flag-actions">
+        <button class="btn btn-success btn-sm" onclick="approveFlag('${escH(item.id)}', '${escH(item.file||'')}', ${item.num||0})" title="Important mark karo">
+          ⭐ Approve
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="dismissFlag('${escH(item.id)}')" title="Dismiss / reject karo">
+          ✕ Dismiss
+        </button>
+      </div>
+    `;
+    list.appendChild(card);
+  });
+}
+
+function getTimeAgo(ts) {
+  if (!ts) return 'Unknown';
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Abhi abhi';
+  if (mins < 60) return mins + ' min pehle';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + ' ghante pehle';
+  const days = Math.floor(hrs / 24);
+  return days + ' din pehle';
+}
+
+async function approveFlag(flagId, file, num) {
+  if (!file || !num) { toast('Flag data incomplete hai!', 'error'); return; }
+  if (!getToken()) { toast('Pehle login karo!', 'error'); return; }
+
+  // Step 1: Load the chapter file
+  toast('⏳ Question load ho raha hai...', 'info', 2000);
+  try {
+    const r = await ghFetch(`contents/questions/${file}`);
+    if (!r.ok) { toast(`❌ File "${file}" load nahi ho paayi!`, 'error'); return; }
+    const data = await r.json();
+    const fileSHA = data.sha;
+    const questions = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\n/g, '')))));
+
+    // Step 2: Find and mark the question as important
+    const qIdx = questions.findIndex(q => q.num === num);
+    if (qIdx === -1) { toast(`❌ Q${num} file "${file}" me nahi mila!`, 'error'); return; }
+
+    if (questions[qIdx].imp) {
+      toast(`ℹ️ Q${num} already important hai — flag dismiss ho jayega`, 'info');
+    } else {
+      questions[qIdx].imp = true;
+      if (!questions[qIdx].freq) questions[qIdx].freq = 2;
+
+      // Step 3: Save back
+      const content = btoa(unescape(encodeURIComponent(JSON.stringify(questions, null, 2))));
+      const body = { message: `Flag approved: Q${num} in ${file}`, content, branch: 'main' };
+      if (fileSHA) body.sha = fileSHA;
+
+      const saveR = await ghFetch(`contents/questions/${file}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!saveR.ok) {
+        const err = await saveR.json();
+        toast('❌ Save fail: ' + (err.message || 'Unknown error'), 'error');
+        return;
+      }
+
+      // Update important-questions.json too
+      // Reuse the current file's questions to build important list
+      const subject = (JSON.parse(localStorage.getItem('file_subjects') || '{}'))[file] || 'math';
+      const chapter = file.replace('.json', '').split('-')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+      try {
+        let impSHA = '';
+        let existing = [];
+        const impR = await ghFetch('contents/questions/important-questions.json');
+        if (impR.ok) {
+          const impD = await impR.json();
+          impSHA = impD.sha;
+          existing = JSON.parse(decodeURIComponent(escape(atob(impD.content.replace(/\n/g, '')))));
+        }
+        existing = existing.filter(q => q._file !== file);
+        const newImp = questions.filter(q => q.imp).map(q => ({
+          ...q, _file: file, _chapter: chapter, _subject: subject
+        }));
+        const final = [...existing, ...newImp];
+        const impContent = btoa(unescape(encodeURIComponent(JSON.stringify(final, null, 2))));
+        const impBody = { message: `Update important-questions.json — flag approved Q${num}`, content: impContent, branch: 'main' };
+        if (impSHA) impBody.sha = impSHA;
+        await ghFetch('contents/questions/important-questions.json', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(impBody),
+        });
+      } catch(e) { console.warn('Important JSON update error:', e); }
+
+      // If this file is currently open in editor, update local state too
+      if (currentFile === file) {
+        const localIdx = existingQ.findIndex(q => q.num === num);
+        if (localIdx !== -1) {
+          existingQ[localIdx].imp = true;
+          if (!existingQ[localIdx].freq) existingQ[localIdx].freq = 2;
+          savedSnapshot = JSON.stringify(existingQ);
+          dirty = false;
+          renderEditor();
+        }
+      }
+    }
+
+    // Step 4: Remove the flag
+    await dismissFlagSilent(flagId);
+    toast(`✅ Q${num} important mark ho gaya! (${file})`, 'success', 5000);
+  } catch(e) {
+    toast('❌ Error: ' + e.message, 'error');
+  }
+}
+
+async function dismissFlag(flagId) {
+  if (!confirm('Is flag ko dismiss / reject karna hai?')) return;
+  await dismissFlagSilent(flagId);
+  toast('🗑️ Flag dismiss ho gaya', 'info');
+}
+
+async function dismissFlagSilent(flagId) {
+  try {
+    // Animate removal
+    const card = document.getElementById('flag-card-' + flagId);
+    if (card) {
+      card.classList.add('removing');
+      await new Promise(r => setTimeout(r, 350));
+    }
+
+    await ghFetch(`flagged/${flagId}`, { method: 'DELETE' });
+    flaggedItems = flaggedItems.filter(f => f.id !== flagId);
+    renderFlaggedPanel();
+    updateFlagBadge();
+  } catch(e) {
+    console.warn('Flag dismiss error:', e);
+  }
+}
+
+  if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/deepak3/sw.js');
+}
+  
+</script>
+</body>
+</html>
