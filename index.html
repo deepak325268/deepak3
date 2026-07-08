@@ -1004,11 +1004,7 @@ function renderContent() {
   if (activeTab === 'important') {
   document.getElementById('doneBanner').classList.remove('show');
   if (!impLoaded) { renderImportant(); return; }
-  if (impView === 'questions') {
-    document.querySelector('.header').style.display = 'none';
-    if (allQuesMode) { renderImpQuestionList(); } else { renderImpQuestion(); }
-    return;
-  }
+  if (impView === 'questions') { if (allQuesMode) { renderImpQuestionList(); } else { renderImpQuestion(); } return; }
   if (impView === 'chapters') { renderImpChapterList(impSubTab); return; }
   renderImpHome();
   return;
