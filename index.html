@@ -1338,7 +1338,7 @@ function showFlagToast(msg) {
 }
 
 function syncFlagsInBackground() {
-  fetch(WORKER_URL_FLAG + '/proxy/flagged')
+  fetch(WORKER_URL_FLAG + '/flagged-list')
     .then(function(r){ return r.json(); })
     .then(function(pendingList) {
       var pendingSet = {};
