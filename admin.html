@@ -838,6 +838,25 @@ async function checkFlagCount() {
   } catch (e) {}
 }
 
+function renderFlagCache() {
+  const listEl = document.getElementById('flag-list');
+  if (flagCache.length === 0) {
+    listEl.innerHTML = '<div style="opacity:0.6">Koi pending flag nahi hai.</div>';
+    document.getElementById('flag-count').style.display = 'none';
+    return;
+  }
+  document.getElementById('flag-count').textContent = flagCache.length;
+  document.getElementById('flag-count').style.display = 'inline';
+  listEl.innerHTML = flagCache.map(function(f, idx) {
+    return '<div style="border:1px solid var(--border,#333);border-radius:8px;padding:10px;margin-bottom:8px">'
+      + '<div style="font-size:13px;opacity:0.7">' + f.file + ' — Q' + f.num + '</div>'
+      + '<div style="margin-top:8px;display:flex;gap:8px">'
+      + '<button onclick="approveFlag(' + idx + ')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">✅ Important banao</button>'
+      + '<button onclick="rejectFlag(' + idx + ')" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">❌ Reject</button>'
+      + '</div></div>';
+  }).join('');
+}
+
 async function openFlagPanel() {
   document.getElementById('flag-panel').style.display = 'block';
   const listEl = document.getElementById('flag-list');
