@@ -359,10 +359,21 @@ function getToken() { return localStorage.getItem('session_token') || ''; }
   </div>
   <div class="header-right">
     <button class="theme-btn" onclick="toggleTheme()" id="theme-btn" title="Light/Dark">🌙</button>
+    <button class="theme-btn" onclick="openFlagPanel()" id="flag-badge-btn" title="Pending Flags">🚩<span id="flag-count" style="display:none"></span></button>
   </div>
 </header>
 
 <div id="toast"></div>
+
+  <div id="flag-panel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;padding:20px;overflow:auto">
+  <div style="background:var(--surface,#1a1d27);max-width:600px;margin:0 auto;border-radius:12px;padding:20px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="font-size:16px">🚩 Pending Flags</h2>
+      <button onclick="closeFlagPanel()" style="background:none;border:none;font-size:20px;cursor:pointer;color:inherit">✕</button>
+    </div>
+    <div id="flag-list">Loading...</div>
+  </div>
+</div>
 
 <div class="mobile-overlay" id="mobile-overlay" onclick="closeMobileDrawer()"></div>
 
@@ -810,6 +821,117 @@ async function checkConnection() {
   }
 }
 
+let flagCache = [];
+
+async function checkFlagCount() {
+  try {
+    const r = await ghFetch('flagged');
+    if (!r.ok) return;
+    flagCache = await r.json();
+    const badge = document.getElementById('flag-count');
+    if (flagCache.length > 0) {
+      badge.textContent = flagCache.length;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  } catch (e) {}
+}
+
+async function openFlagPanel() {
+  document.getElementById('flag-panel').style.display = 'block';
+  const listEl = document.getElementById('flag-list');
+  listEl.innerHTML = 'Loading...';
+
+  const r = await ghFetch('flagged');
+  if (!r.ok) { listEl.innerHTML = 'Error loading flags.'; return; }
+  flagCache = await r.json();
+
+  if (flagCache.length === 0) {
+    listEl.innerHTML = '<div style="opacity:0.6">Koi pending flag nahi hai.</div>';
+    return;
+  }
+
+  listEl.innerHTML = flagCache.map(function(f, idx) {
+    return '<div style="border:1px solid var(--border,#333);border-radius:8px;padding:10px;margin-bottom:8px">'
+      + '<div style="font-size:13px;opacity:0.7">' + f.file + ' — Q' + f.num + '</div>'
+      + '<div style="margin-top:8px;display:flex;gap:8px">'
+      + '<button onclick="approveFlag(' + idx + ')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">✅ Important banao</button>'
+      + '<button onclick="rejectFlag(' + idx + ')" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">❌ Reject</button>'
+      + '</div></div>';
+  }).join('');
+}
+
+function closeFlagPanel() {
+  document.getElementById('flag-panel').style.display = 'none';
+}
+
+async function approveFlag(idx) {
+  const f = flagCache[idx];
+  try {
+    // 1. Chapter file uthao
+    const fr = await ghFetch('contents/questions/' + f.file);
+    if (!fr.ok) { toast('❌ Chapter file nahi mili', 'error'); return; }
+    const fd = await fr.json();
+    const arr = JSON.parse(decodeURIComponent(escape(atob(fd.content.replace(/\n/g,'')))));
+
+    const q = arr.find(function(x){ return x.num === f.num; });
+    if (!q) { toast('❌ Question nahi mila is chapter me', 'error'); return; }
+    q.imp = true;
+    if (!q.freq) q.freq = 2;
+
+    // 2. Chapter file wapas save karo
+    const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(arr, null, 2))));
+    const pr = await ghFetch('contents/questions/' + f.file, {
+      method: 'PUT',
+      body: JSON.stringify({ message: 'Approve flag Q' + f.num, content: newContent, branch: 'main' })
+    });
+    if (!pr.ok) { toast('❌ Save fail ho gaya', 'error'); return; }
+
+    // 3. important-questions.json me is chapter ki poori slice rebuild karo
+    const subjMatch = f.file.replace(/\.json$/i, '');
+    const chapterName = subjMatch.split('-').map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+    const metaR = await ghFetch('contents/questions/meta.json');
+    let subject = 'math';
+    if (metaR.ok) {
+      const md = await metaR.json();
+      const metaObj = JSON.parse(decodeURIComponent(escape(atob(md.content.replace(/\n/g,'')))));
+      subject = metaObj[f.file] || 'math';
+    }
+
+    let existingImp = [];
+    const impR = await ghFetch('contents/questions/important-questions.json');
+    if (impR.ok) {
+      const id = await impR.json();
+      existingImp = JSON.parse(decodeURIComponent(escape(atob(id.content.replace(/\n/g,'')))));
+    }
+    existingImp = existingImp.filter(function(x){ return x._file !== f.file; });
+    arr.filter(function(x){ return x.imp; }).forEach(function(x) {
+      existingImp.push(Object.assign({}, x, { _file: f.file, _chapter: chapterName, _subject: subject }));
+    });
+    const impContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingImp, null, 2))));
+    await ghFetch('contents/questions/important-questions.json', {
+      method: 'PUT',
+      body: JSON.stringify({ message: 'Update important-questions.json', content: impContent, branch: 'main' })
+    });
+
+    // 4. Flag delete karo
+    await ghFetch('flagged/' + f.id, { method: 'DELETE' });
+    toast('✅ Important ban gaya!', 'success');
+    openFlagPanel();
+  } catch (e) {
+    toast('❌ Error: ' + e.message, 'error');
+  }
+}
+
+async function rejectFlag(idx) {
+  const f = flagCache[idx];
+  await ghFetch('flagged/' + f.id, { method: 'DELETE' });
+  toast('Flag reject ho gaya', 'success');
+  openFlagPanel();
+}
+
+  
 // ═══════════════════════════════════════════
 //  LOAD FILES (सुरक्षित तरीके से meta.json सिंक किया गया)
 // ═══════════════════════════════════════════
@@ -817,6 +939,7 @@ async function loadFiles() {
   if (!getToken()) return;
   try {
     checkConnection();
+    checkFlagCount();
     // meta.json को सुरक्षित फ़ेच करना
     try {
       const metaRes = await ghFetch(`contents/questions/meta.json?t=${Date.now()}`);
