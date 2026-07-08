@@ -560,6 +560,10 @@
     .q-page-header {
       display: flex; align-items: center; gap: 10px;
       padding: 4px 0 8px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
     }
     .q-back-btn {
       background: none; border: 1.5px solid var(--border);
@@ -999,8 +1003,15 @@ function renderContent() {
   var content = document.getElementById("content");
   if (activeTab === 'important') {
   document.getElementById('doneBanner').classList.remove('show');
+    
+  if (activeTab === 'important') {
+  document.getElementById('doneBanner').classList.remove('show');
   if (!impLoaded) { renderImportant(); return; }
-  if (impView === 'questions') { if (allQuesMode) { renderImpQuestionList(); } else { renderImpQuestion(); } return; }
+  if (impView === 'questions') {
+    document.querySelector('.header').style.display = 'none';
+    if (allQuesMode) { renderImpQuestionList(); } else { renderImpQuestion(); }
+    return;
+  }
   if (impView === 'chapters') { renderImpChapterList(impSubTab); return; }
   renderImpHome();
   return;
