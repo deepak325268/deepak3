@@ -63,7 +63,7 @@
     }
 
     html {
-      overflow-x: hidden;
+      overflow: clip;
       width: 100%;
     }
     body {
@@ -72,7 +72,7 @@
       font-family: 'Inter', 'Noto Sans Devanagari', sans-serif;
       min-height: 100vh;
       padding-bottom: 60px;
-      overflow-x: hidden;
+      overflow: clip;
       width: 100%;
       transition: background-color 0.3s, color 0.3s;
       touch-action: manipulation;
@@ -238,6 +238,7 @@
       background: var(--card);
       border-bottom: 1px solid var(--border);
       transition: background-color 0.3s, border-color 0.3s;
+      position: sticky; top: 0; z-index: 9;
     }
     .progress-track {
       flex: 1; height: 6px;
@@ -561,6 +562,8 @@
     .q-page-header {
       display: flex; align-items: center; gap: 10px;
       padding: 4px 0 8px;
+      position: sticky; top: 0; z-index: 100;
+      background: var(--bg);
     }
     .q-back-btn {
       background: none; border: 1.5px solid var(--border);
