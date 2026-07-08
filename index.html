@@ -1213,7 +1213,7 @@ function renderQuestionPage(content) {
 
     // Question body
     + '<div class="q-page-body">'
-    +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+'</div>'
+    +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(typeof impMarkedSet!=="undefined" && impMarkedSet.has && impMarkedSet.has(ch.questionsFile+"_"+sub.q)?' <span style="font-size:11px;color:#ff9800;font-weight:700;">⭐ IMP</span>':'')+'</div>'
     +   (q
         ? (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
           + (q.text ? '<div class="q-page-eng">'+escH(q.text)+'</div>' : '')
