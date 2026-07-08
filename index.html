@@ -1003,9 +1003,6 @@ function renderContent() {
   var content = document.getElementById("content");
   if (activeTab === 'important') {
   document.getElementById('doneBanner').classList.remove('show');
-    
-  if (activeTab === 'important') {
-  document.getElementById('doneBanner').classList.remove('show');
   if (!impLoaded) { renderImportant(); return; }
   if (impView === 'questions') {
     document.querySelector('.header').style.display = 'none';
