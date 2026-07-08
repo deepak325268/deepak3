@@ -1243,7 +1243,15 @@ function renderQuestionPageList(content) {
   var subs  = ch.subs;
   var bank  = qBankCache[ch.questionsFile] || [];
   var done  = doneSet.has(currentChKey);
-
+  
+    function flagOrImp(file, num) {
+    var isImp = typeof impMarkedSet !== "undefined" && impMarkedSet.has && impMarkedSet.has(file + "_" + num);
+    if (isImp) return ' <span style="font-size:11px;color:#ff9800;font-weight:700;">⭐ IMP</span>';
+    var flagKey = 'flagged_' + file + '_' + num;
+    var isFlagged = localStorage.getItem(flagKey);
+    return ' <button class="flag-btn' + (isFlagged ? ' flagged' : '') + '" onclick="flagQuestion(\'' + file + '\',' + num + ')" title="Important ke liye flag karo">' + (isFlagged ? '🚩' : '🏳️') + '</button>';
+  }
+  
   var qHtml = subs.map(function(sub) {
     var q = null;
     for (var i=0; i<bank.length; i++) { if (bank[i].num === sub.q) { q = bank[i]; break; } }
@@ -1254,7 +1262,7 @@ function renderQuestionPageList(content) {
         + '</div>';
     }
     return '<div class="q-page-body">'
-      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?' <button class="flag-btn'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?' flagged':'')+'" onclick="flagQuestion(\''+ch.questionsFile+'\','+sub.q+')" title="Important ke liye flag karo">'+(localStorage.getItem('flagged_'+ch.questionsFile+'_'+sub.q)?'🚩':'🏳️')+'</button>'+(typeof impMarkedSet!=="undefined" && impMarkedSet.has && impMarkedSet.has(ch.questionsFile+"_"+sub.q)?' <span style="font-size:11px;color:#ff9800;font-weight:700;">⭐ IMP</span>':''):'')+'</div>'
+      +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(q?flagOrImp(ch.questionsFile, sub.q):'')+'</div>'
       +   (q
           ? (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
             + (q.text ? '<div class="q-page-eng">'+escH(q.text)+'</div>' : '')
