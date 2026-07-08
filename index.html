@@ -1444,16 +1444,27 @@ function loadImportantData(cb) {
       var tod = new Date(); tod.setHours(0,0,0,0);
       var dayNum = Math.floor((tod - start) / 86400000);
 
+      var groups = {};
       qs.forEach(function(q) {
-        var subj = q._subject || 'math';
-        if (impAllQFull[subj]) impAllQFull[subj].push(q);
-
         var freq = q.freq || 2;
-        var actualFreq = (freq === 1) ? 1 : (freq + 1);
+        var gKey = q._file + '|' + freq;
+        if (!groups[gKey]) groups[gKey] = [];
+        groups[gKey].push(q);
+      });
 
-        if (dayNum % actualFreq === q.num % actualFreq) {
-          if (impAllQ[subj]) impAllQ[subj].push(q);
-        }
+      Object.keys(groups).forEach(function(gKey) {
+        var list = groups[gKey];
+        list.forEach(function(q, pos) {
+          var subj = q._subject || 'math';
+          if (impAllQFull[subj]) impAllQFull[subj].push(q);
+
+          var freq = q.freq || 2;
+          var actualFreq = (freq === 1) ? 1 : (freq + 1);
+
+          if (dayNum % actualFreq === pos % actualFreq) {
+            if (impAllQ[subj]) impAllQ[subj].push(q);
+          }
+        });
       });
 
       impLoaded = true;
