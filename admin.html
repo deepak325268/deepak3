@@ -868,15 +868,17 @@ function closeFlagPanel() {
 
 async function approveFlag(idx) {
   const f = flagCache[idx];
+  const listEl = document.getElementById('flag-list');
+  if (listEl.children[idx]) listEl.children[idx].style.opacity = '0.3';
   try {
     // 1. Chapter file uthao
     const fr = await ghFetch('contents/questions/' + f.file);
-    if (!fr.ok) { toast('❌ Chapter file nahi mili', 'error'); return; }
+    if (!fr.ok) { toast('❌ Chapter file nahi mili', 'error'); renderFlagCache(); return; }
     const fd = await fr.json();
     const arr = JSON.parse(decodeURIComponent(escape(atob(fd.content.replace(/\n/g,'')))));
 
     const q = arr.find(function(x){ return x.num === f.num; });
-    if (!q) { toast('❌ Question nahi mila is chapter me', 'error'); return; }
+    if (!q) { toast('❌ Question nahi mila is chapter me', 'error'); renderFlagCache(); return; }
     q.imp = true;
     if (!q.freq) q.freq = 2;
 
@@ -884,11 +886,12 @@ async function approveFlag(idx) {
     const newContent = btoa(unescape(encodeURIComponent(JSON.stringify(arr, null, 2))));
     const pr = await ghFetch('contents/questions/' + f.file, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Approve flag Q' + f.num, content: newContent, branch: 'main' })
     });
-    if (!pr.ok) { toast('❌ Save fail ho gaya', 'error'); return; }
+    if (!pr.ok) { toast('❌ Chapter save fail', 'error'); renderFlagCache(); return; }
 
-    // 3. important-questions.json me is chapter ki poori slice rebuild karo
+    // 3. important-questions.json rebuild karo
     const subjMatch = f.file.replace(/\.json$/i, '');
     const chapterName = subjMatch.split('-').map(function(w){ return w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
     const metaR = await ghFetch('contents/questions/meta.json');
@@ -910,20 +913,24 @@ async function approveFlag(idx) {
       existingImp.push(Object.assign({}, x, { _file: f.file, _chapter: chapterName, _subject: subject }));
     });
     const impContent = btoa(unescape(encodeURIComponent(JSON.stringify(existingImp, null, 2))));
-    await ghFetch('contents/questions/important-questions.json', {
+    const impSaveR = await ghFetch('contents/questions/important-questions.json', {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Update important-questions.json', content: impContent, branch: 'main' })
     });
+    if (!impSaveR.ok) { toast('❌ Important-questions save fail', 'error'); renderFlagCache(); return; }
 
     // 4. Flag delete karo
     await ghFetch('flagged/' + f.id, { method: 'DELETE' });
     toast('✅ Important ban gaya!', 'success');
-    openFlagPanel();
+    flagCache.splice(idx, 1);
+    renderFlagCache();
   } catch (e) {
     toast('❌ Error: ' + e.message, 'error');
+    renderFlagCache();
   }
 }
-
+  
 async function rejectFlag(idx) {
   const f = flagCache[idx];
   const listEl = document.getElementById('flag-list');
