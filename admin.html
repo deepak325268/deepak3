@@ -926,9 +926,18 @@ async function approveFlag(idx) {
 
 async function rejectFlag(idx) {
   const f = flagCache[idx];
+  const listEl = document.getElementById('flag-list');
+  if (listEl.children[idx]) listEl.children[idx].style.opacity = '0.3';
   await ghFetch('flagged/' + f.id, { method: 'DELETE' });
+  flagCache.splice(idx, 1);
   toast('Flag reject ho gaya', 'success');
-  openFlagPanel();
+  if (flagCache.length === 0) {
+    listEl.innerHTML = '<div style="opacity:0.6">Koi pending flag nahi hai.</div>';
+    document.getElementById('flag-count').style.display = 'none';
+  } else {
+    if (listEl.children[idx]) listEl.children[idx].remove();
+    document.getElementById('flag-count').textContent = flagCache.length;
+  }
 }
 
   
