@@ -848,7 +848,11 @@ function renderFlagCache() {
   }
   document.getElementById('flag-count').textContent = flagCache.length;
   document.getElementById('flag-count').style.display = 'inline';
-  listEl.innerHTML = flagCache.map(function(f, idx) {
+  const bulkBar = '<div style="display:flex;gap:8px;margin-bottom:12px">'
+    + '<button onclick="approveAllFlags()" style="flex:1;background:#16a34a;color:#fff;border:none;border-radius:6px;padding:9px 10px;cursor:pointer;font-weight:600;font-size:13px">✅ Sabko Important banao</button>'
+    + '<button onclick="rejectAllFlags()" style="flex:1;background:#dc2626;color:#fff;border:none;border-radius:6px;padding:9px 10px;cursor:pointer;font-weight:600;font-size:13px">❌ Sabko Reject karo</button>'
+    + '</div>';
+  listEl.innerHTML = bulkBar + flagCache.map(function(f, idx) {
     return '<div style="border:1px solid var(--border,#333);border-radius:8px;padding:10px;margin-bottom:8px">'
       + '<div style="font-size:13px;opacity:0.7">' + f.file + ' — Q' + f.num + '</div>'
       + '<div style="margin-top:8px;display:flex;gap:8px">'
@@ -866,39 +870,25 @@ async function openFlagPanel() {
   const r = await ghFetch('flagged');
   if (!r.ok) { listEl.innerHTML = 'Error loading flags.'; return; }
   flagCache = await r.json();
-
-  if (flagCache.length === 0) {
-    listEl.innerHTML = '<div style="opacity:0.6">Koi pending flag nahi hai.</div>';
-    return;
-  }
-
-  listEl.innerHTML = flagCache.map(function(f, idx) {
-    return '<div style="border:1px solid var(--border,#333);border-radius:8px;padding:10px;margin-bottom:8px">'
-      + '<div style="font-size:13px;opacity:0.7">' + f.file + ' — Q' + f.num + '</div>'
-      + '<div style="margin-top:8px;display:flex;gap:8px">'
-      + '<button onclick="approveFlag(' + idx + ')" style="background:#16a34a;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">✅ Important banao</button>'
-      + '<button onclick="rejectFlag(' + idx + ')" style="background:#dc2626;color:#fff;border:none;border-radius:6px;padding:6px 12px;cursor:pointer">❌ Reject</button>'
-      + '</div></div>';
-  }).join('');
+  renderFlagCache();
 }
 
 function closeFlagPanel() {
   document.getElementById('flag-panel').style.display = 'none';
 }
 
-async function approveFlag(idx) {
-  const f = flagCache[idx];
-  const listEl = document.getElementById('flag-list');
-  if (listEl.children[idx]) listEl.children[idx].style.opacity = '0.3';
+// ── Core approve/reject logic, ek single flag object 'f' par kaam karta hai ──
+// UI update ya flagCache splice nahi karta — caller (single ya bulk) yeh khud sambhalta hai.
+async function doApproveFlag(f) {
   try {
     // 1. Chapter file uthao
     const fr = await ghFetch('contents/questions/' + f.file);
-    if (!fr.ok) { toast('❌ Chapter file nahi mili', 'error'); renderFlagCache(); return; }
+    if (!fr.ok) return { ok: false, msg: 'Chapter file nahi mili' };
     const fd = await fr.json();
     const arr = JSON.parse(decodeURIComponent(escape(atob(fd.content.replace(/\n/g,'')))));
 
     const q = arr.find(function(x){ return x.num === f.num; });
-    if (!q) { toast('❌ Question nahi mila is chapter me', 'error'); renderFlagCache(); return; }
+    if (!q) return { ok: false, msg: 'Question nahi mila is chapter me' };
     q.imp = true;
     if (!q.freq) q.freq = 2;
 
@@ -909,7 +899,7 @@ async function approveFlag(idx) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Approve flag Q' + f.num, content: newContent, branch: 'main' })
     });
-    if (!pr.ok) { toast('❌ Chapter save fail', 'error'); renderFlagCache(); return; }
+    if (!pr.ok) return { ok: false, msg: 'Chapter save fail' };
 
     // 3. important-questions.json rebuild karo
     const subjMatch = f.file.replace(/\.json$/i, '');
@@ -938,33 +928,85 @@ async function approveFlag(idx) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: 'Update important-questions.json', content: impContent, branch: 'main' })
     });
-    if (!impSaveR.ok) { toast('❌ Important-questions save fail', 'error'); renderFlagCache(); return; }
+    if (!impSaveR.ok) return { ok: false, msg: 'Important-questions save fail' };
 
     // 4. Flag delete karo
     await ghFetch('flagged/' + f.id, { method: 'DELETE' });
-    toast('✅ Important ban gaya!', 'success');
-    flagCache.splice(idx, 1);
-    renderFlagCache();
+    return { ok: true };
   } catch (e) {
-    toast('❌ Error: ' + e.message, 'error');
-    renderFlagCache();
+    return { ok: false, msg: e.message };
   }
 }
-  
+
+async function doRejectFlag(f) {
+  try {
+    await ghFetch('flagged/' + f.id, { method: 'DELETE' });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, msg: e.message };
+  }
+}
+
+async function approveFlag(idx) {
+  const f = flagCache[idx];
+  const listEl = document.getElementById('flag-list');
+  if (listEl.children[idx + 1]) listEl.children[idx + 1].style.opacity = '0.3';
+  const res = await doApproveFlag(f);
+  if (res.ok) {
+    toast('✅ Important ban gaya!', 'success');
+    flagCache.splice(idx, 1);
+  } else {
+    toast('❌ ' + res.msg, 'error');
+  }
+  renderFlagCache();
+}
+
 async function rejectFlag(idx) {
   const f = flagCache[idx];
   const listEl = document.getElementById('flag-list');
-  if (listEl.children[idx]) listEl.children[idx].style.opacity = '0.3';
-  await ghFetch('flagged/' + f.id, { method: 'DELETE' });
+  if (listEl.children[idx + 1]) listEl.children[idx + 1].style.opacity = '0.3';
+  await doRejectFlag(f);
   flagCache.splice(idx, 1);
   toast('Flag reject ho gaya', 'success');
-  if (flagCache.length === 0) {
-    listEl.innerHTML = '<div style="opacity:0.6">Koi pending flag nahi hai.</div>';
-    document.getElementById('flag-count').style.display = 'none';
-  } else {
-    if (listEl.children[idx]) listEl.children[idx].remove();
-    document.getElementById('flag-count').textContent = flagCache.length;
+  renderFlagCache();
+}
+
+// ── Bulk actions: sabko ek Sath accept ya reject karo (Firebase par ek-ek karke, sequential) ──
+async function approveAllFlags() {
+  if (flagCache.length === 0) return;
+  const total = flagCache.length;
+  if (!confirm('Sabhi ' + total + ' flagged questions ko Important banayein?')) return;
+
+  const listEl = document.getElementById('flag-list');
+  let okCount = 0, failCount = 0;
+  while (flagCache.length > 0) {
+    listEl.innerHTML = '<div style="opacity:0.7;padding:14px;text-align:center">⏳ Processing ' + (okCount + failCount + 1) + ' / ' + total + '...</div>';
+    const f = flagCache[0];
+    const res = await doApproveFlag(f);
+    if (res.ok) okCount++; else failCount++;
+    flagCache.splice(0, 1);
   }
+  renderFlagCache();
+  if (failCount > 0) {
+    toast('✅ ' + okCount + ' approved, ❌ ' + failCount + ' fail ho gaye', 'error');
+  } else {
+    toast('✅ Sabhi ' + okCount + ' important ban gaye!', 'success');
+  }
+}
+
+async function rejectAllFlags() {
+  if (flagCache.length === 0) return;
+  const total = flagCache.length;
+  if (!confirm('Sabhi ' + total + ' flagged questions reject karein?')) return;
+
+  const listEl = document.getElementById('flag-list');
+  listEl.innerHTML = '<div style="opacity:0.7;padding:14px;text-align:center">⏳ Rejecting...</div>';
+  for (const f of flagCache.slice()) {
+    await doRejectFlag(f);
+  }
+  flagCache = [];
+  renderFlagCache();
+  toast('✅ Sabhi ' + total + ' reject ho gaye!', 'success');
 }
 
   
