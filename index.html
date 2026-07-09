@@ -1603,6 +1603,8 @@ function resetImpTopicCache() {
 }
 
 function renderImpQuestion() {
+  document.querySelector('.header').style.display = 'none';
+  document.querySelector('.progress-wrap').style.display = 'none';
   var content = document.getElementById("content");
   var qs = impCurrentCh || impAllQ[impSubTab];
   var total = qs.length;
@@ -1660,6 +1662,8 @@ function renderImpQuestion() {
 
 // ── ALL QUE. mode: important tab ke sabhi questions ek saath upar se niche list mein ──
 function renderImpQuestionList() {
+  document.querySelector('.header').style.display = 'none';
+  document.querySelector('.progress-wrap').style.display = 'none';
   var content = document.getElementById("content");
   var qs = impCurrentCh || impAllQ[impSubTab];
   var clr = impSubTab === 'reasoning' ? 'r' : 'o';
