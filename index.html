@@ -1304,32 +1304,65 @@ function loadQBank(file, cb) {
 // ── Misc ──
 function haptic() { if (navigator.vibrate) navigator.vibrate(10); }
 
+  var flagPending = {}; // key -> { desiredFlagged, btn, file, num, timer }
+
   function flagQuestion(file, num) {
   haptic();
   var btn = event.currentTarget;
   var key = 'flagged_' + file + '_' + num;
-  var alreadyFlagged = localStorage.getItem(key);
-  var endpoint = alreadyFlagged ? '/unflag' : '/flag';
+  var p = flagPending[key];
+  var currentState = p ? p.desiredFlagged : !!localStorage.getItem(key);
+  var newState = !currentState;
+
+  // ── Turant UI update (network ka wait nahi) ──
+  if (newState) {
+    localStorage.setItem(key, '1');
+    btn.classList.add('flagged');
+    btn.textContent = '🚩';
+  } else {
+    localStorage.removeItem(key);
+    btn.classList.remove('flagged');
+    btn.textContent = '🏳️';
+  }
+
+  // ── Rapid multi-click ko ek hi final request mein combine karo ──
+  if (p) clearTimeout(p.timer);
+  flagPending[key] = {
+    desiredFlagged: newState,
+    btn: btn, file: file, num: num,
+    timer: setTimeout(function(){ commitFlag(key); }, 350)
+  };
+}
+
+function commitFlag(key) {
+  var p = flagPending[key];
+  if (!p) return;
+  delete flagPending[key];
+  var endpoint = p.desiredFlagged ? '/flag' : '/unflag';
 
   fetch(WORKER_URL_FLAG + endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ file: file, num: num })
+    body: JSON.stringify({ file: p.file, num: p.num })
   }).then(function(r){
     if (r.ok) {
-      if (alreadyFlagged) {
-        localStorage.removeItem(key);
-        btn.classList.remove('flagged');
-        btn.textContent = '🏳️';
-        showFlagToast('⬜ Unflag ho gaya!');
-      } else {
-        localStorage.setItem(key, '1');
-        btn.classList.add('flagged');
-        btn.textContent = '🚩';
-        showFlagToast('🚩 Flag ho gaya!');
-      }
-    } else { showFlagToast('Fail ho gaya'); }
-  }).catch(function(){ showFlagToast('Network error'); });
+      showFlagToast(p.desiredFlagged ? '🚩 Flag ho gaya!' : '⬜ Unflag ho gaya!');
+    } else {
+      revertFlagUI(key, p);
+    }
+  }).catch(function(){ revertFlagUI(key, p); });
+}
+
+function revertFlagUI(key, p) {
+  // Server sync fail hua, optimistic update wapas palto
+  if (p.desiredFlagged) {
+    localStorage.removeItem(key);
+    if (p.btn) { p.btn.classList.remove('flagged'); p.btn.textContent = '🏳️'; }
+  } else {
+    localStorage.setItem(key, '1');
+    if (p.btn) { p.btn.classList.add('flagged'); p.btn.textContent = '🚩'; }
+  }
+  showFlagToast('❌ Sync fail, dobara try karo');
 }
   
 function showFlagToast(msg) {
