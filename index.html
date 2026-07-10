@@ -869,7 +869,14 @@ let currentCh      = null;     // current chapter object
 let currentChKey   = null;     // key like "math_2"
 let currentQIdx    = 0;        // which question index (0-based into ch.subs)
 let currentClr     = 'o';
-let allQuesMode    = false;   // true = sabhi topics ke SABHI questions dikhao (day-filter bypass)
+let allQuesMode    = localStorage.getItem('allQuesMode') === '1';   // true = sabhi topics ke SABHI questions dikhao (day-filter bypass)
+
+if (allQuesMode) {
+  var _allQueBtn = document.getElementById('allQueBtn');
+  if (_allQueBtn) _allQueBtn.textContent = "🏠 Today's View";
+  var _menuBtn = document.getElementById('menuBtn');
+  if (_menuBtn) _menuBtn.classList.add('active');
+}
 
 
 var cached = localStorage.getItem(cacheKey);
@@ -984,6 +991,7 @@ document.addEventListener('click', function(e) {
 function toggleAllQuesMode() {
   haptic();
   allQuesMode = !allQuesMode;
+  localStorage.setItem('allQuesMode', allQuesMode ? '1' : '0');
   var btn = document.getElementById('allQueBtn');
   btn.textContent = allQuesMode ? "🏠 Today's View" : "📋 All Questions";
   document.getElementById('menuBtn').classList.toggle('active', allQuesMode);
