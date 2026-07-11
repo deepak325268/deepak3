@@ -42,6 +42,11 @@ header .sub{font-size:12px;color:var(--muted)}
 .layout{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 66px)}
 .left-panel{border-right:1px solid var(--border);overflow-y:auto;background:var(--surface);display:flex;flex-direction:column}
 .right-panel{overflow-y:auto;background:var(--bg);padding:20px}
+/* LEFT PANEL — desktop hide/show toggle (zyada jagah ke liye jab question editor pe kaam karo) */
+@media (min-width:861px){
+  .layout.lp-collapsed{grid-template-columns:0px 1fr}
+  .layout.lp-collapsed .left-panel{display:none}
+}
 
 /* LEFT PANEL sections */
 .lp-section{border-bottom:1px solid var(--border);padding:16px}
@@ -523,6 +528,7 @@ function getToken() { return localStorage.getItem('session_token') || ''; }
         <div class="rp-tab active" id="rtab-editor" onclick="switchRTab('editor')">✏️ Editor</div>
         <div class="rp-tab" id="rtab-preview" onclick="switchRTab('preview')">👁️ Preview</div>
       </div>
+      <button class="btn btn-outline btn-sm" onclick="toggleLeftPanel()" id="lp-toggle-btn" title="Left panel chhupao/dikhao — zyada jagah ke liye">⬅️ Panel Chhupao</button>
       <button class="btn btn-outline btn-sm" onclick="expandAll()">📖 Sab Kholo</button>
       <button class="btn btn-outline btn-sm" onclick="collapseAll()">📕 Sab Band</button>
       <button class="btn btn-outline btn-sm" onclick="renumberAll()">🔢 Renumber</button>
@@ -618,6 +624,16 @@ function closeMobileDrawerIfMobile() {
   if (window.innerWidth <= 860) closeMobileDrawer();
 }
 
+function toggleLeftPanel() {
+  const hidden = document.querySelector('.layout').classList.toggle('lp-collapsed');
+  localStorage.setItem('lp_collapsed', hidden ? '1' : '0');
+  updateLpToggleBtn(hidden);
+}
+function updateLpToggleBtn(hidden) {
+  const btn = document.getElementById('lp-toggle-btn');
+  if (btn) btn.innerHTML = hidden ? '➡️ Panel Dikhao' : '⬅️ Panel Chhupao';
+}
+  
 // ═══════════════════════════════════════════
 //  DRAFT AUTO-SAVE (localStorage) — refresh/reload pe
 //  currently-open file + unsaved edits waapis aa jaate hain
@@ -700,6 +716,9 @@ window.onload = async function() {
 
   const collapsed = localStorage.getItem('settings_collapsed') === '1';
   if (collapsed) collapseSettings(false);
+  const lpCollapsed = localStorage.getItem('lp_collapsed') === '1';
+  if (lpCollapsed) { document.querySelector('.layout').classList.add('lp-collapsed'); }
+  updateLpToggleBtn(lpCollapsed);
 
   if (getToken()) { await loadFiles(); restoreDraftIfAny(); }
 };
