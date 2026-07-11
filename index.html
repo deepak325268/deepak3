@@ -786,9 +786,6 @@
   display: flex; align-items: center; justify-content: center;
 }
 .q-topic-reset-btn:active { transform: scale(0.85); background: var(--border); }
-
- .ai-cursor { display:inline-block; animation: blink 1s step-start infinite; }
-@keyframes blink { 50% { opacity: 0; } }
     
   </style>
 </head>
@@ -856,67 +853,20 @@ function buildInitialPrompt(q) {
     + qText + optsText + ansHint;
 }
 
-function callGemini(contents, cb, onChunk) {
+function callGemini(contents, cb) {
   fetch(WORKER_URL_AI + "/ai-solve", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ contents: contents })
-  }).then(function(r) {
-    if (!r.body) { cb('Stream not supported', null); return; }
-    var reader = r.body.getReader();
-    var decoder = new TextDecoder();
-    var buffer = '';
-    var fullText = '';
-    function pump() {
-      reader.read().then(function(result) {
-        if (result.done) {
-          if (fullText) cb(null, fullText);
-          else cb('AI se jawab nahi mil paaya.', null);
-          return;
-        }
-        buffer += decoder.decode(result.value, { stream: true });
-        var lines = buffer.split('\n');
-        buffer = lines.pop();
-        lines.forEach(function(line) {
-          line = line.trim();
-          if (!line.startsWith('data:')) return;
-          var jsonStr = line.slice(5).trim();
-          if (!jsonStr || jsonStr === '[DONE]') return;
-          try {
-            var obj = JSON.parse(jsonStr);
-            var piece = obj.candidates && obj.candidates[0] &&
-                        obj.candidates[0].content && obj.candidates[0].content.parts &&
-                        obj.candidates[0].content.parts[0].text;
-            if (piece) {
-              fullText += piece;
-              if (onChunk) onChunk(fullText);
-            }
-          } catch (e) {}
-        });
-        pump();
-      }).catch(function(err){ cb(err.message, null); });
-    }
-    pump();
-  }).catch(function(err){ cb(err.message, null); });
-}
-
-function startStreamingBubble(box) {
-  var msgsEl = document.getElementById('aiChatMsgs');
-  if (!msgsEl) {
-    box.innerHTML = '<div class="ai-chat-msgs" id="aiChatMsgs"></div>';
-    msgsEl = document.getElementById('aiChatMsgs');
-  }
-  var bubble = document.createElement('div');
-  bubble.className = 'ai-msg model';
-  msgsEl.appendChild(bubble);
-  msgsEl.scrollTop = msgsEl.scrollHeight;
-  return bubble;
-}
-
-function updateStreamingBubble(bubble, text) {
-  bubble.innerHTML = escH(text).replace(/\n/g,'<br>') + '<span class="ai-cursor">▍</span>';
-  var msgsEl = document.getElementById('aiChatMsgs');
-  if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var text = null;
+    try { text = data.candidates[0].content.parts[0].text; } catch (e) {}
+    if (text) { cb(null, text); }
+    else { cb((data.error && data.error.message) || 'AI se jawab nahi mil paaya.', null); }
+  })
+  .catch(function(err){ cb(err.message, null); });
 }
 
 function renderAIChat(box, contents) {
@@ -952,17 +902,18 @@ function askAIFollowup() {
   var box = document.getElementById('aiSolBox');
   renderAIChat(box, contents);
 
+  var msgsEl = document.getElementById('aiChatMsgs');
+  var typing = document.createElement('div');
+  typing.className = 'ai-msg model';
+  typing.textContent = '...';
+  if (msgsEl) { msgsEl.appendChild(typing); msgsEl.scrollTop = msgsEl.scrollHeight; }
   var sendBtn = document.getElementById('aiChatSend');
   if (sendBtn) sendBtn.disabled = true;
-
-  var bubble = startStreamingBubble(box);
 
   callGemini(contents, function(err, replyText) {
     contents.push({ role: 'model', parts: [{ text: err ? ('⚠️ ' + err) : replyText }] });
     aiChatCache[cacheKey] = contents;
     renderAIChat(box, contents);
-  }, function(partialText) {
-    updateStreamingBubble(bubble, partialText);
   });
 }
 
@@ -995,11 +946,10 @@ function askAI(btn) {
   var origLabel = btn.innerHTML;
   btn.innerHTML = '⏳';
   box.style.display = 'block';
-  box.className = 'ai-sol-box';
-  box.innerHTML = '<div class="ai-chat-msgs" id="aiChatMsgs"></div>';
+  box.className = 'ai-sol-box loading';
+  box.innerHTML = 'AI solution bana raha hai...';
 
   var contents = [{ role: 'user', parts: [{ text: buildInitialPrompt(q) }] }];
-  var bubble = startStreamingBubble(box);
 
   callGemini(contents, function(err, replyText) {
     btn.disabled = false;
@@ -1009,8 +959,6 @@ function askAI(btn) {
     contents.push({ role: 'model', parts: [{ text: replyText }] });
     aiChatCache[cacheKey] = contents;
     renderAIChat(box, contents);
-  }, function(partialText) {
-    updateStreamingBubble(bubble, partialText);
   });
 }
 
