@@ -895,6 +895,7 @@ function askAI(btn) {
     if (box.style.display === 'block' && box.innerHTML.trim() !== '') {
     box.style.display = 'none';
     return;
+  }
 
   var key = getGeminiKey(true);
   if (!key) return;
