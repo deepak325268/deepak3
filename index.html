@@ -641,6 +641,24 @@
     }
     .q-page-num.clr-o { color: var(--accent-o); background: var(--pill-o-bg); border: 1px solid var(--pill-o-border); }
     .q-page-num.clr-r { color: var(--accent-r); background: var(--pill-r-bg); border: 1px solid var(--pill-r-border); }
+    .q-page-num-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .ai-btn {
+    flex-shrink: 0; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 800; font-family: 'Inter', sans-serif;
+    padding: 6px 12px; border-radius: 20px; color: #fff;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+   box-shadow: 0 3px 10px rgba(147,51,234,0.35);
+   margin-bottom: 14px; -webkit-tap-highlight-color: transparent;
+ }
+ .ai-btn:active { transform: scale(0.92); }
+ .ai-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+ .ai-sol-box {
+  margin: -4px 0 18px; padding: 12px 14px; border-radius: 14px;
+  background: var(--check-bg); border: 1.5px dashed var(--accent-r);
+  font-size: 14px; line-height: 1.6; color: var(--text);
+  font-family: 'Noto Sans Devanagari', sans-serif;
+}
+.ai-sol-box.loading { color: var(--muted); font-style: italic; }
 
     .q-page-hindi {
       font-size: 18px; font-weight: 700; color: var(--text);
@@ -777,6 +795,7 @@
       <a href="chapter-order.html" class="menu-item" onclick="return handleMenuLink(event, 'chapter-order.html')">🔀 Chapter Order</a>
       <a href="coverage-check.html" class="menu-item" onclick="return handleMenuLink(event, 'coverage-check.html')">📊 Coverage Check</a>
       <a href="important-preview.html" class="menu-item" onclick="return handleMenuLink(event, 'important-preview.html')">🔁 Important Preview</a>
+      <button class="menu-item" onclick="changeGeminiKey()">🔑 AI Key Badlein</button>
     </div>
   </div>
 </div>
@@ -812,6 +831,89 @@
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
 }
+
+
+const GEMINI_MODEL = "gemini-2.5-flash";
+var aiSolCache = {};
+
+function getGeminiKey(promptIfMissing) {
+  var k = localStorage.getItem("gemini_api_key");
+  if (!k && promptIfMissing) {
+    k = window.prompt("Apni Gemini API Key daalein:\n\nFree key: https://aistudio.google.com/apikey");
+    if (k && k.trim()) { k = k.trim(); localStorage.setItem("gemini_api_key", k); } else { k = null; }
+  }
+  return k;
+}
+
+function changeGeminiKey() {
+  haptic();
+  var dd = document.getElementById('menuDropdown');
+  if (dd) dd.classList.remove('show');
+  localStorage.removeItem("gemini_api_key");
+  var k = getGeminiKey(true);
+  if (k) alert("✅ AI Key save ho gayi!");
+}
+
+function askAI(btn) {
+  haptic();
+  var q = window.__aiQ;
+  var box = document.getElementById('aiSolBox');
+  if (!q || !box) return;
+  var key = getGeminiKey(true);
+  if (!key) return;
+
+  var cacheKey = GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
+  if (aiSolCache[cacheKey]) {
+    box.style.display = 'block';
+    box.className = 'ai-sol-box';
+    box.innerHTML = aiSolCache[cacheKey];
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([box]).catch(function(){});
+    return;
+  }
+
+  btn.disabled = true;
+  var origLabel = btn.innerHTML;
+  btn.innerHTML = '⏳';
+  box.style.display = 'block';
+  box.className = 'ai-sol-box loading';
+  box.innerHTML = 'AI solution bana raha hai...';
+
+  var qText = (q.hindi ? q.hindi + '\n' : '') + (q.text ? q.text + '\n' : '');
+  var optsText = (q.opts && q.opts.length) ? ('Options: ' + q.opts.join(' | ')) : '';
+  var promptText = "Tum ek exam tutor ho. Neeche ek multiple-choice question hai. Sahi option batao aur short, step-by-step solution Hindi mein samjhao.\n\n" + qText + optsText + (q.ans ? ("\n(Answer key hint: " + q.ans + ")") : "");
+
+  fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + encodeURIComponent(key), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var text;
+    try { text = data.candidates[0].content.parts[0].text; }
+    catch (e) {
+      if (data.error && data.error.message) {
+        text = "⚠️ Error: " + data.error.message;
+        if (data.error.code === 400 && /API key/i.test(data.error.message)) { localStorage.removeItem("gemini_api_key"); text += "\n(Key galat lagti hai, dobara AI button dabayein.)"; }
+      } else { text = "⚠️ AI se jawab nahi mil paaya, dobara try karein."; }
+    }
+    var safe = escH(text).replace(/\n/g, '<br>');
+    aiSolCache[cacheKey] = safe;
+    box.className = 'ai-sol-box';
+    box.innerHTML = safe;
+    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([box]).catch(function(){});
+  })
+  .catch(function(err){
+    box.className = 'ai-sol-box';
+    box.innerHTML = '⚠️ Network/error: ' + escH(err.message);
+  })
+  .finally(function(){
+    btn.disabled = false;
+    btn.innerHTML = origLabel;
+  });
+}
+
+  
 const API_MATH = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app/revisionData.json";
 const FIREBASE_URL = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app";
 const QUESTIONS_BASE = FIREBASE_URL + "/questionBank/files/";
@@ -1200,6 +1302,7 @@ function renderQuestionPage(content) {
 
   var pct = Math.round(((idx+1)/total)*100);
   var isLast = (idx === total-1);
+  window.__aiQ = q ? { hindi: q.hindi, text: q.text, opts: q.opts, ans: q.ans } : null;
 
   var optsHtml = "";
   if (q && q.opts && q.opts.length) {
@@ -1224,7 +1327,11 @@ function renderQuestionPage(content) {
 
     // Question body
     + '<div class="q-page-body">'
-    +   '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(typeof impMarkedSet!=="undefined" && impMarkedSet.has && impMarkedSet.has(ch.questionsFile+"_"+sub.q)?' <span style="font-size:11px;color:#ff9800;font-weight:700;">⭐ IMP</span>':'')+'</div>'
+    +   '<div class="q-page-num-row">'
+    +     '<div class="q-page-num clr-'+clr+'">Q. '+sub.q+(typeof impMarkedSet!=="undefined" && impMarkedSet.has && impMarkedSet.has(ch.questionsFile+"_"+sub.q)?' <span style="font-size:11px;color:#ff9800;font-weight:700;">⭐ IMP</span>':'')+'</div>'
+    +     (q ? '<button class="ai-btn" id="aiBtn" onclick="askAI(this)">✨ AI</button>' : '')
+    +   '</div>'
+    +   '<div id="aiSolBox" class="ai-sol-box" style="display:none"></div>'
     +   (q
         ? (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
           + (q.text ? '<div class="q-page-eng">'+escH(q.text)+'</div>' : '')
@@ -1701,6 +1808,7 @@ function renderImpQuestion() {
   var pct = Math.round(((impQIdx+1)/total)*100);
   var isLast = impQIdx === total-1;
   var isDone = doneSet.has("imp_" + impSubTab + "_" + q.num);
+  window.__aiQ = { hindi: q.hindi, text: q.text, opts: q.opts, ans: q.ans };
 
   var optsHtml = '';
   if (q.opts && q.opts.length) {
@@ -1720,7 +1828,11 @@ function renderImpQuestion() {
     + '</div>'
     + '<div class="q-page-prog-track"><div class="q-page-prog-fill fill-'+clr+'" style="width:'+pct+'%"></div></div>'
     + '<div class="q-page-body">'
-    +   '<div class="q-page-num clr-'+clr+'">Q. '+q.num+'</div>'
+    +   '<div class="q-page-num-row">'
+    +     '<div class="q-page-num clr-'+clr+'">Q. '+q.num+'</div>'
+    +     '<button class="ai-btn" id="aiBtn" onclick="askAI(this)">✨ AI</button>'
+    +   '</div>'
+    +   '<div id="aiSolBox" class="ai-sol-box" style="display:none"></div>'
     +   (q.hindi ? '<div class="q-page-hindi">'+escH(q.hindi)+'</div>' : '')
     +   (q.text  ? '<div class="q-page-eng">'+escH(q.text)+'</div>'   : '')
     +   optsHtml
