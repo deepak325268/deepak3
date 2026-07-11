@@ -1556,6 +1556,20 @@ var impMarkedSet = new Set();
 var impView = 'home';
 var impChapters = { math: {}, reasoning: {} };
 var impCurrentCh = null;
+var impChapterOrderArr = { math: [], reasoning: [] };  // homepage wala custom chapter order
+
+function sortByChapterOrder(list, subj) {
+  var order = impChapterOrderArr[subj] || [];
+  if (!order.length) return list;
+  return list.slice().sort(function(a, b) {
+    var ai = order.indexOf(a._chapter);
+    var bi = order.indexOf(b._chapter);
+    if (ai === -1) ai = order.length;
+    if (bi === -1) bi = order.length;
+    if (ai !== bi) return ai - bi;
+    return (a.num||0) - (b.num||0);
+  });
+}
 
 function fileToChapter(f) {
   return f.replace('.json','').split('-').map(function(w){
@@ -1564,9 +1578,16 @@ function fileToChapter(f) {
 }
 
 function loadImportantData(cb) {
-  fetch(QUESTIONS_BASE + 'important-questions.json?v=' + Date.now())
-    .then(function(r){ return r.json(); })
-    .then(function(qs) {
+  Promise.all([
+    fetch(QUESTIONS_BASE + 'important-questions.json?v=' + Date.now()).then(function(r){ return r.json(); }),
+    fetchChapterOrder('math'),
+    fetchChapterOrder('reasoning')
+  ])
+    .then(function(results) {
+      var qs = results[0];
+      impChapterOrderArr.math      = results[1] || [];
+      impChapterOrderArr.reasoning = results[2] || [];
+
       impAllQ = { math:[], reasoning:[] };
       impAllQFull = { math:[], reasoning:[] };
       impChapters = { math: {}, reasoning: {} };
@@ -1597,6 +1618,13 @@ function loadImportantData(cb) {
           }
         });
       });
+
+      // Homepage wale chapter-order ke hisaab se sort kar do
+      impAllQFull.math      = sortByChapterOrder(impAllQFull.math, 'math');
+      impAllQFull.reasoning = sortByChapterOrder(impAllQFull.reasoning, 'reasoning');
+      impAllQ.math      = sortByChapterOrder(impAllQ.math, 'math');
+      impAllQ.reasoning = sortByChapterOrder(impAllQ.reasoning, 'reasoning');
+
       impMarkedSet = new Set();
       qs.forEach(function(q){ impMarkedSet.add(q._file + '_' + q.num); });
       impLoaded = true;
@@ -1834,7 +1862,13 @@ function renderImpChapterList(subj) {
     if (!groups[chName]) groups[chName] = [];
     groups[chName].push(q);
   });
-  var chapterNames = Object.keys(groups).sort();
+  var order = impChapterOrderArr[subj] || [];
+  var chapterNames = Object.keys(groups).sort(function(a, b) {
+  var ai = order.indexOf(a); if (ai === -1) ai = order.length;
+  var bi = order.indexOf(b); if (bi === -1) bi = order.length;
+  if (ai !== bi) return ai - bi;
+  return a.localeCompare(b);
+});
   var clr = subj === 'reasoning' ? 'r' : 'o';
 
   var html = '<button class="q-back-btn" style="margin:12px 0 8px" onclick="goImpHome()">‹ BACK</button>';
