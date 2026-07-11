@@ -803,6 +803,7 @@
       <a href="chapter-order.html" class="menu-item" onclick="return handleMenuLink(event, 'chapter-order.html')">🔀 Chapter Order</a>
       <a href="coverage-check.html" class="menu-item" onclick="return handleMenuLink(event, 'coverage-check.html')">📊 Coverage Check</a>
       <a href="important-preview.html" class="menu-item" onclick="return handleMenuLink(event, 'important-preview.html')">🔁 Important Preview</a>
+      <button class="menu-item" onclick="setGeminiKey()">⚡ Fast AI Key (Optional)</button>
     </div>
   </div>
 </div>
@@ -841,7 +842,7 @@
 
 
 const GEMINI_MODEL = "gemini-3.5-flash";
-var aiChatCache = {};   // cacheKey -> puri conversation history (array)
+var aiChatCache = {};
 
 function buildInitialPrompt(q) {
   var qText = (q.hindi ? q.hindi + '\n' : '') + (q.text ? q.text + '\n' : '');
@@ -853,25 +854,75 @@ function buildInitialPrompt(q) {
     + qText + optsText + ansHint;
 }
 
-function callGemini(contents, cb) {
-  fetch(WORKER_URL_AI + "/ai-solve", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: contents })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    var text = null;
-    try { text = data.candidates[0].content.parts[0].text; } catch (e) {}
-    if (text) { cb(null, text); }
-    else { cb((data.error && data.error.message) || 'AI se jawab nahi mil paaya.', null); }
-  })
-  .catch(function(err){ cb(err.message, null); });
+function getLocalGeminiKey() { return localStorage.getItem("gemini_api_key"); }
+
+function setGeminiKey() {
+  haptic();
+  var dd = document.getElementById('menuDropdown');
+  if (dd) dd.classList.remove('show');
+  var k = window.prompt("Apni Gemini API Key daalo (optional, fast reply ke liye):\n\nFree key: https://aistudio.google.com/apikey\n\nKhaali chhod ke OK dabao to key hata degi.");
+  if (k === null) return;
+  k = k.trim();
+  if (k) { localStorage.setItem("gemini_api_key", k); alert("✅ Local key save ho gayi! Ab AI reply fast aayega."); }
+  else { localStorage.removeItem("gemini_api_key"); alert("Local key hata di gayi. Ab worker use hoga."); }
+}
+
+// ── Streaming caller: chunk-chunk text aata hai, live dikhta hai ──
+function streamGemini(contents, onChunk, onDone) {
+  var localKey = getLocalGeminiKey();
+  var url, opts;
+
+  if (localKey) {
+    url = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":streamGenerateContent?alt=sse&key=" + encodeURIComponent(localKey);
+    opts = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: contents, generationConfig: { thinkingConfig: { thinkingLevel: "MINIMAL" }, maxOutputTokens: 800 } })
+    };
+  } else {
+    url = WORKER_URL_AI + "/ai-solve-stream";
+    opts = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: contents }) };
+  }
+
+  fetch(url, opts).then(function(res) {
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = "";
+    var fullText = "";
+    var gotError = null;
+
+    function pump() {
+      return reader.read().then(function(result) {
+        if (result.done) {
+          if (fullText) onDone(null, fullText);
+          else onDone(gotError || "AI se jawab nahi mil paaya.", null);
+          return;
+        }
+        buffer += decoder.decode(result.value, { stream: true });
+        var lines = buffer.split("\n");
+        buffer = lines.pop();
+        lines.forEach(function(line) {
+          line = line.trim();
+          if (!line.startsWith("data:")) return;
+          var jsonStr = line.slice(5).trim();
+          if (!jsonStr) return;
+          try {
+            var obj = JSON.parse(jsonStr);
+            if (obj.error) { gotError = obj.error.message; return; }
+            var piece = obj.candidates && obj.candidates[0] && obj.candidates[0].content && obj.candidates[0].content.parts && obj.candidates[0].content.parts[0] && obj.candidates[0].content.parts[0].text;
+            if (piece) { fullText += piece; onChunk(piece); }
+          } catch (e) {}
+        });
+        return pump();
+      });
+    }
+    return pump();
+  }).catch(function(err){ onDone(err.message, null); });
 }
 
 function renderAIChat(box, contents) {
   var msgsHtml = contents.map(function(c, i){
-    if (i === 0) return ''; // pehla auto-generated prompt hide rakho
+    if (i === 0) return '';
     var cls = c.role === 'user' ? 'user' : 'model';
     var text = (c.parts && c.parts[0] && c.parts[0].text) || '';
     return '<div class="ai-msg ' + cls + '">' + escH(text).replace(/\n/g,'<br>') + '</div>';
@@ -903,21 +954,24 @@ function askAIFollowup() {
   renderAIChat(box, contents);
 
   var msgsEl = document.getElementById('aiChatMsgs');
-  var typing = document.createElement('div');
-  typing.className = 'ai-msg model';
-  typing.textContent = '...';
-  if (msgsEl) { msgsEl.appendChild(typing); msgsEl.scrollTop = msgsEl.scrollHeight; }
+  var liveMsg = document.createElement('div');
+  liveMsg.className = 'ai-msg model';
+  liveMsg.textContent = '';
+  if (msgsEl) { msgsEl.appendChild(liveMsg); msgsEl.scrollTop = msgsEl.scrollHeight; }
   var sendBtn = document.getElementById('aiChatSend');
   if (sendBtn) sendBtn.disabled = true;
 
-  callGemini(contents, function(err, replyText) {
-    contents.push({ role: 'model', parts: [{ text: err ? ('⚠️ ' + err) : replyText }] });
+  var live = "";
+  streamGemini(contents, function(chunk){
+    live += chunk;
+    liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>');
+    if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+  }, function(err, fullText){
+    contents.push({ role: 'model', parts: [{ text: err ? ('⚠️ ' + err) : fullText }] });
     aiChatCache[cacheKey] = contents;
     renderAIChat(box, contents);
   });
 }
-
-
 
 function askAI(btn) {
   haptic();
@@ -928,13 +982,8 @@ function askAI(btn) {
   var cacheKey = GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
   window.__aiCacheKey = cacheKey;
 
-  // Dobara dabane pe band kar do
-  if (box.style.display === 'block') {
-    box.style.display = 'none';
-    return;
-  }
+  if (box.style.display === 'block') { box.style.display = 'none'; return; }
 
-  // Pehle se conversation hai to bina API call ke wapas dikha do
   if (aiChatCache[cacheKey]) {
     box.style.display = 'block';
     box.className = 'ai-sol-box';
@@ -946,17 +995,21 @@ function askAI(btn) {
   var origLabel = btn.innerHTML;
   btn.innerHTML = '⏳';
   box.style.display = 'block';
-  box.className = 'ai-sol-box loading';
-  box.innerHTML = 'AI solution bana raha hai...';
+  box.className = 'ai-sol-box';
+  box.innerHTML = '<div class="ai-chat-msgs"><div class="ai-msg model" id="aiLiveMsg"></div></div>';
 
   var contents = [{ role: 'user', parts: [{ text: buildInitialPrompt(q) }] }];
+  var liveMsg = document.getElementById('aiLiveMsg');
+  var live = "";
 
-  callGemini(contents, function(err, replyText) {
+  streamGemini(contents, function(chunk){
+    live += chunk;
+    if (liveMsg) liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>');
+  }, function(err, fullText){
     btn.disabled = false;
     btn.innerHTML = origLabel;
-    box.className = 'ai-sol-box';
-    if (err) { box.innerHTML = '⚠️ ' + escH(err); return; }
-    contents.push({ role: 'model', parts: [{ text: replyText }] });
+    if (err && !fullText) { box.innerHTML = '⚠️ ' + escH(err); return; }
+    contents.push({ role: 'model', parts: [{ text: fullText }] });
     aiChatCache[cacheKey] = contents;
     renderAIChat(box, contents);
   });
