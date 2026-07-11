@@ -659,6 +659,14 @@
   font-family: 'Noto Sans Devanagari', sans-serif;
 }
 .ai-sol-box.loading { color: var(--muted); font-style: italic; }
+.ai-chat-msgs { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:320px; overflow-y:auto; }
+.ai-msg { padding:8px 12px; border-radius:12px; font-size:13.5px; line-height:1.5; max-width:92%; }
+.ai-msg.user { background: var(--pill-o-bg); align-self:flex-end; color:var(--text); border:1px solid var(--pill-o-border); }
+.ai-msg.model { background: var(--card); align-self:flex-start; border:1px solid var(--border); }
+.ai-chat-input-row { display:flex; gap:6px; }
+.ai-chat-input { flex:1; padding:8px 10px; border-radius:10px; border:1.5px solid var(--border); font-size:13px; background:var(--card); color:var(--text); font-family:'Noto Sans Devanagari', sans-serif; }
+.ai-chat-send { border:none; background:var(--accent-r); color:#fff; padding:8px 14px; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px; flex-shrink:0; }
+.ai-chat-send:disabled { opacity:0.5; cursor:not-allowed; }
 
     .q-page-hindi {
       font-size: 18px; font-weight: 700; color: var(--text);
@@ -795,7 +803,6 @@
       <a href="chapter-order.html" class="menu-item" onclick="return handleMenuLink(event, 'chapter-order.html')">🔀 Chapter Order</a>
       <a href="coverage-check.html" class="menu-item" onclick="return handleMenuLink(event, 'coverage-check.html')">📊 Coverage Check</a>
       <a href="important-preview.html" class="menu-item" onclick="return handleMenuLink(event, 'important-preview.html')">🔁 Important Preview</a>
-      <button class="menu-item" onclick="changeGeminiKey()">🔑 AI Key Badlein</button>
     </div>
   </div>
 </div>
@@ -834,40 +841,104 @@
 
 
 const GEMINI_MODEL = "gemini-3.5-flash";
-var aiSolCache = {};
+var aiChatCache = {};   // cacheKey -> puri conversation history (array)
 
-function getGeminiKey(promptIfMissing) {
-  var k = localStorage.getItem("gemini_api_key");
-  if (!k && promptIfMissing) {
-    k = window.prompt("Apni Gemini API Key daalein:\n\nFree key: https://aistudio.google.com/apikey");
-    if (k && k.trim()) { k = k.trim(); localStorage.setItem("gemini_api_key", k); } else { k = null; }
-  }
-  return k;
+function buildInitialPrompt(q) {
+  var qText = (q.hindi ? q.hindi + '\n' : '') + (q.text ? q.text + '\n' : '');
+  var optsText = (q.opts && q.opts.length) ? ('Options: ' + q.opts.join(' | ')) : '';
+  var ansHint = q.ans ? ("\n(Answer key hint: " + q.ans + ")") : "";
+  return "Tum ek exam tutor ho. Neeche ek multiple-choice question hai (Math/Reasoning competitive exam). "
+    + "Sahi option batao aur short, step-by-step solution Hindi mein samjhao. Bahut lamba mat likho, seedha point par raho. "
+    + "Aage bhi student is question ke baare me follow-up sawal pooch sakta hai, unka bhi seedha Hindi me jawab dena.\n\n"
+    + qText + optsText + ansHint;
 }
 
-function changeGeminiKey() {
-  haptic();
-  var dd = document.getElementById('menuDropdown');
-  if (dd) dd.classList.remove('show');
-  localStorage.removeItem("gemini_api_key");
-  var k = getGeminiKey(true);
-  if (k) alert("✅ AI Key save ho gayi!");
+function callGemini(contents, cb) {
+  fetch(WORKER_URL_AI + "/ai-solve", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: contents })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var text = null;
+    try { text = data.candidates[0].content.parts[0].text; } catch (e) {}
+    if (text) { cb(null, text); }
+    else { cb((data.error && data.error.message) || 'AI se jawab nahi mil paaya.', null); }
+  })
+  .catch(function(err){ cb(err.message, null); });
 }
+
+function renderAIChat(box, contents) {
+  var msgsHtml = contents.map(function(c, i){
+    if (i === 0) return ''; // pehla auto-generated prompt hide rakho
+    var cls = c.role === 'user' ? 'user' : 'model';
+    var text = (c.parts && c.parts[0] && c.parts[0].text) || '';
+    return '<div class="ai-msg ' + cls + '">' + escH(text).replace(/\n/g,'<br>') + '</div>';
+  }).join('');
+  box.innerHTML =
+    '<div class="ai-chat-msgs" id="aiChatMsgs">' + msgsHtml + '</div>'
+    + '<div class="ai-chat-input-row">'
+    +   '<input type="text" class="ai-chat-input" id="aiChatInput" placeholder="Is question ke baare me kuch aur pucho...">'
+    +   '<button class="ai-chat-send" id="aiChatSend" onclick="askAIFollowup()">Bhejo</button>'
+    + '</div>';
+  if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([box]).catch(function(){});
+  var msgsEl = document.getElementById('aiChatMsgs');
+  if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
+  var inputEl = document.getElementById('aiChatInput');
+  if (inputEl) inputEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); askAIFollowup(); } });
+}
+
+function askAIFollowup() {
+  var inputEl = document.getElementById('aiChatInput');
+  if (!inputEl) return;
+  var msg = inputEl.value.trim();
+  if (!msg) return;
+  var cacheKey = window.__aiCacheKey;
+  var contents = aiChatCache[cacheKey];
+  if (!contents) return;
+
+  contents.push({ role: 'user', parts: [{ text: msg }] });
+  var box = document.getElementById('aiSolBox');
+  renderAIChat(box, contents);
+
+  var msgsEl = document.getElementById('aiChatMsgs');
+  var typing = document.createElement('div');
+  typing.className = 'ai-msg model';
+  typing.textContent = '...';
+  if (msgsEl) { msgsEl.appendChild(typing); msgsEl.scrollTop = msgsEl.scrollHeight; }
+  var sendBtn = document.getElementById('aiChatSend');
+  if (sendBtn) sendBtn.disabled = true;
+
+  callGemini(contents, function(err, replyText) {
+    contents.push({ role: 'model', parts: [{ text: err ? ('⚠️ ' + err) : replyText }] });
+    aiChatCache[cacheKey] = contents;
+    renderAIChat(box, contents);
+  });
+}
+
+
 
 function askAI(btn) {
   haptic();
   var q = window.__aiQ;
   var box = document.getElementById('aiSolBox');
   if (!q || !box) return;
-  var key = getGeminiKey(true);
-  if (!key) return;
 
   var cacheKey = GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
-  if (aiSolCache[cacheKey]) {
+  window.__aiCacheKey = cacheKey;
+
+  // Dobara dabane pe band kar do
+  if (box.style.display === 'block') {
+    box.style.display = 'none';
+    return;
+  }
+
+  // Pehle se conversation hai to bina API call ke wapas dikha do
+  if (aiChatCache[cacheKey]) {
     box.style.display = 'block';
     box.className = 'ai-sol-box';
-    box.innerHTML = aiSolCache[cacheKey];
-    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([box]).catch(function(){});
+    renderAIChat(box, aiChatCache[cacheKey]);
     return;
   }
 
@@ -878,38 +949,16 @@ function askAI(btn) {
   box.className = 'ai-sol-box loading';
   box.innerHTML = 'AI solution bana raha hai...';
 
-  var qText = (q.hindi ? q.hindi + '\n' : '') + (q.text ? q.text + '\n' : '');
-  var optsText = (q.opts && q.opts.length) ? ('Options: ' + q.opts.join(' | ')) : '';
-  var promptText = "Tum ek exam tutor ho. Neeche ek multiple-choice question hai. Sahi option batao aur short, step-by-step solution Hindi mein samjhao.\n\n" + qText + optsText + (q.ans ? ("\n(Answer key hint: " + q.ans + ")") : "");
+  var contents = [{ role: 'user', parts: [{ text: buildInitialPrompt(q) }] }];
 
-  fetch("https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent?key=" + encodeURIComponent(key), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    var text;
-    try { text = data.candidates[0].content.parts[0].text; }
-    catch (e) {
-      if (data.error && data.error.message) {
-        text = "⚠️ Error: " + data.error.message;
-        if (data.error.code === 400 && /API key/i.test(data.error.message)) { localStorage.removeItem("gemini_api_key"); text += "\n(Key galat lagti hai, dobara AI button dabayein.)"; }
-      } else { text = "⚠️ AI se jawab nahi mil paaya, dobara try karein."; }
-    }
-    var safe = escH(text).replace(/\n/g, '<br>');
-    aiSolCache[cacheKey] = safe;
-    box.className = 'ai-sol-box';
-    box.innerHTML = safe;
-    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([box]).catch(function(){});
-  })
-  .catch(function(err){
-    box.className = 'ai-sol-box';
-    box.innerHTML = '⚠️ Network/error: ' + escH(err.message);
-  })
-  .finally(function(){
+  callGemini(contents, function(err, replyText) {
     btn.disabled = false;
     btn.innerHTML = origLabel;
+    box.className = 'ai-sol-box';
+    if (err) { box.innerHTML = '⚠️ ' + escH(err); return; }
+    contents.push({ role: 'model', parts: [{ text: replyText }] });
+    aiChatCache[cacheKey] = contents;
+    renderAIChat(box, contents);
   });
 }
 
@@ -918,6 +967,7 @@ const API_MATH = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.fi
 const FIREBASE_URL = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app";
 const QUESTIONS_BASE = FIREBASE_URL + "/questionBank/files/";
 const WORKER_URL_FLAG = "https://deepak3-admin-proxy.ctetone31.workers.dev";
+const WORKER_URL_AI = "https://deepak3-ai-proxy.ctetone31.workers.dev";
 
 // ── Chapter-order.html tool se save kiya hua custom order apply karta hai ──
 function applyCustomOrder(chapters, order) {
