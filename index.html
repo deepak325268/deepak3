@@ -659,6 +659,8 @@
   font-family: 'Noto Sans Devanagari', sans-serif;
 }
 .ai-sol-box.loading { color: var(--muted); font-style: italic; }
+.ai-typing { animation: aiTypingPulse 1.2s ease-in-out infinite; color: var(--muted); font-size: 20px; letter-spacing: 2px; }
+@keyframes aiTypingPulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
 .ai-chat-msgs { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; max-height:320px; overflow-y:auto; }
 .ai-msg { padding:8px 12px; border-radius:12px; font-size:13.5px; line-height:1.5; max-width:92%; }
 .ai-msg.user { background: var(--pill-o-bg); align-self:flex-end; color:var(--text); border:1px solid var(--pill-o-border); }
@@ -996,7 +998,7 @@ function askAI(btn) {
   btn.innerHTML = '⏳';
   box.style.display = 'block';
   box.className = 'ai-sol-box';
-  box.innerHTML = '<div class="ai-chat-msgs"><div class="ai-msg model" id="aiLiveMsg"></div></div>';
+  box.innerHTML = '<div class="ai-chat-msgs"><div class="ai-msg model ai-typing" id="aiLiveMsg">●&nbsp;●&nbsp;●</div></div>';
 
   var contents = [{ role: 'user', parts: [{ text: buildInitialPrompt(q) }] }];
   var liveMsg = document.getElementById('aiLiveMsg');
@@ -1004,7 +1006,7 @@ function askAI(btn) {
 
   streamGemini(contents, function(chunk){
     live += chunk;
-    if (liveMsg) liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>');
+    if (liveMsg) { liveMsg.className = 'ai-msg model'; liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>'); }
   }, function(err, fullText){
     btn.disabled = false;
     btn.innerHTML = origLabel;
