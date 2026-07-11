@@ -853,22 +853,54 @@ function buildInitialPrompt(q) {
     + qText + optsText + ansHint;
 }
 
-function callGemini(contents, cb) {
-  fetch(WORKER_URL_AI + "/ai-solve", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: contents })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    var text = null;
-    try { text = data.candidates[0].content.parts[0].text; } catch (e) {}
-    if (text) { cb(null, text); }
-    else { cb((data.error && data.error.message) || 'AI se jawab nahi mil paaya.', null); }
-  })
-  .catch(function(err){ cb(err.message, null); });
+// 1. Naya callGemini function (Streaming support)
+async function callGemini(contents, onUpdate, cb) {
+  try {
+    const res = await fetch(WORKER_URL_AI + "/ai-solve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: contents })
+    });
+    
+    if (!res.ok) {
+      cb("Server error", null);
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let fullText = "";
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop(); 
+
+      for (const line of lines) {
+        if (line.trim().startsWith("data:")) {
+          const dataStr = line.replace(/^data:\s*/, "").trim();
+          if (!dataStr) continue;
+          try {
+            const data = JSON.parse(dataStr);
+            const newText = data.candidates[0].content.parts[0].text;
+            fullText += newText;
+            onUpdate(fullText); 
+          } catch (e) {
+          }
+        }
+      }
+    }
+    cb(null, fullText);
+  } catch (err) {
+    cb(err.message, null);
+  }
 }
 
+// 2. Original renderAIChat function (Isko badalna nahi tha, bas wapas paste karna hai)
 function renderAIChat(box, contents) {
   var msgsHtml = contents.map(function(c, i){
     if (i === 0) return ''; // pehla auto-generated prompt hide rakho
@@ -889,6 +921,7 @@ function renderAIChat(box, contents) {
   if (inputEl) inputEl.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); askAIFollowup(); } });
 }
 
+// 3. Naya askAIFollowup function
 function askAIFollowup() {
   var inputEl = document.getElementById('aiChatInput');
   if (!inputEl) return;
@@ -899,26 +932,38 @@ function askAIFollowup() {
   if (!contents) return;
 
   contents.push({ role: 'user', parts: [{ text: msg }] });
+  contents.push({ role: 'model', parts: [{ text: '✨ Type kar raha hai...' }] }); 
+  
   var box = document.getElementById('aiSolBox');
   renderAIChat(box, contents);
 
-  var msgsEl = document.getElementById('aiChatMsgs');
-  var typing = document.createElement('div');
-  typing.className = 'ai-msg model';
-  typing.textContent = '...';
-  if (msgsEl) { msgsEl.appendChild(typing); msgsEl.scrollTop = msgsEl.scrollHeight; }
   var sendBtn = document.getElementById('aiChatSend');
   if (sendBtn) sendBtn.disabled = true;
+  
+  var msgsEl = document.getElementById('aiChatMsgs');
 
-  callGemini(contents, function(err, replyText) {
-    contents.push({ role: 'model', parts: [{ text: err ? ('⚠️ ' + err) : replyText }] });
+  callGemini(contents.slice(0, -1), function onUpdate(currentText) {
+    if (msgsEl) {
+      var bubbles = msgsEl.querySelectorAll('.ai-msg.model');
+      var lastBubble = bubbles[bubbles.length - 1];
+      if (lastBubble) {
+        lastBubble.innerHTML = escH(currentText).replace(/\n/g, '<br>');
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }
+    }
+  }, function onDone(err, replyText) {
+    if (err) {
+      contents.pop();
+      contents.push({ role: 'model', parts: [{ text: '⚠️ ' + err }] });
+    } else {
+      contents[contents.length-1].parts[0].text = replyText;
+    }
     aiChatCache[cacheKey] = contents;
-    renderAIChat(box, contents);
+    renderAIChat(box, contents); 
   });
 }
 
-
-
+// 4. Naya askAI function
 function askAI(btn) {
   haptic();
   var q = window.__aiQ;
@@ -928,13 +973,11 @@ function askAI(btn) {
   var cacheKey = GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
   window.__aiCacheKey = cacheKey;
 
-  // Dobara dabane pe band kar do
   if (box.style.display === 'block') {
     box.style.display = 'none';
     return;
   }
 
-  // Pehle se conversation hai to bina API call ke wapas dikha do
   if (aiChatCache[cacheKey]) {
     box.style.display = 'block';
     box.className = 'ai-sol-box';
@@ -946,22 +989,37 @@ function askAI(btn) {
   var origLabel = btn.innerHTML;
   btn.innerHTML = '⏳';
   box.style.display = 'block';
-  box.className = 'ai-sol-box loading';
-  box.innerHTML = 'AI solution bana raha hai...';
+  box.className = 'ai-sol-box';
 
   var contents = [{ role: 'user', parts: [{ text: buildInitialPrompt(q) }] }];
+  contents.push({ role: 'model', parts: [{ text: '✨ Type kar raha hai...' }] }); 
 
-  callGemini(contents, function(err, replyText) {
+  renderAIChat(box, contents);
+  var msgsEl = document.getElementById('aiChatMsgs');
+
+  callGemini(contents.slice(0, -1), function onUpdate(currentText) {
+    if (msgsEl) {
+      var bubbles = msgsEl.querySelectorAll('.ai-msg.model');
+      var lastBubble = bubbles[bubbles.length - 1];
+      if (lastBubble) {
+        lastBubble.innerHTML = escH(currentText).replace(/\n/g, '<br>');
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }
+    }
+  }, function onDone(err, replyText) {
     btn.disabled = false;
     btn.innerHTML = origLabel;
-    box.className = 'ai-sol-box';
-    if (err) { box.innerHTML = '⚠️ ' + escH(err); return; }
-    contents.push({ role: 'model', parts: [{ text: replyText }] });
+    
+    if (err) {
+      contents.pop();
+      contents.push({ role: 'model', parts: [{ text: '⚠️ ' + err }] });
+    } else {
+      contents[contents.length-1].parts[0].text = replyText;
+    }
     aiChatCache[cacheKey] = contents;
-    renderAIChat(box, contents);
+    renderAIChat(box, contents); 
   });
 }
-
   
 const API_MATH = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app/revisionData.json";
 const FIREBASE_URL = "https://bpsc-sachin-sir-revise-default-rtdb.asia-southeast1.firebasedatabase.app";
