@@ -1558,14 +1558,22 @@ var impChapters = { math: {}, reasoning: {} };
 var impCurrentCh = null;
 var impChapterOrderArr = { math: [], reasoning: [] };  // homepage wala custom chapter order
 
-function sortByChapterOrder(list, subj) {
+function normChapterName(s) { return String(s==null?'':s).trim().toLowerCase(); }
+
+function chapterOrderIndex(subj) {
   var order = impChapterOrderArr[subj] || [];
-  if (!order.length) return list;
+  var map = {};
+  order.forEach(function(name, i) { map[normChapterName(name)] = i; });
+  return { map: map, len: order.length };
+}
+
+function sortByChapterOrder(list, subj) {
+  var oi = chapterOrderIndex(subj);
+  if (!oi.len) return list;
   return list.slice().sort(function(a, b) {
-    var ai = order.indexOf(a._chapter);
-    var bi = order.indexOf(b._chapter);
-    if (ai === -1) ai = order.length;
-    if (bi === -1) bi = order.length;
+    var ak = normChapterName(a._chapter), bk = normChapterName(b._chapter);
+    var ai = oi.map.hasOwnProperty(ak) ? oi.map[ak] : oi.len;
+    var bi = oi.map.hasOwnProperty(bk) ? oi.map[bk] : oi.len;
     if (ai !== bi) return ai - bi;
     return (a.num||0) - (b.num||0);
   });
@@ -1862,10 +1870,11 @@ function renderImpChapterList(subj) {
     if (!groups[chName]) groups[chName] = [];
     groups[chName].push(q);
   });
-  var order = impChapterOrderArr[subj] || [];
+  var oi = chapterOrderIndex(subj);
   var chapterNames = Object.keys(groups).sort(function(a, b) {
-  var ai = order.indexOf(a); if (ai === -1) ai = order.length;
-  var bi = order.indexOf(b); if (bi === -1) bi = order.length;
+  var ak = normChapterName(a), bk = normChapterName(b);
+  var ai = oi.map.hasOwnProperty(ak) ? oi.map[ak] : oi.len;
+  var bi = oi.map.hasOwnProperty(bk) ? oi.map[bk] : oi.len;
   if (ai !== bi) return ai - bi;
   return a.localeCompare(b);
 });
