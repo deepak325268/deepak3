@@ -19,6 +19,7 @@
     window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script src="https://js.puter.com/v2/"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -806,6 +807,7 @@
       <a href="coverage-check.html" class="menu-item" onclick="return handleMenuLink(event, 'coverage-check.html')">📊 Coverage Check</a>
       <a href="important-preview.html" class="menu-item" onclick="return handleMenuLink(event, 'important-preview.html')">🔁 Important Preview</a>
       <button class="menu-item" onclick="setGeminiKey()">⚡ Fast AI Key (Optional)</button>
+      <button class="menu-item" id="aiProviderBtn" onclick="toggleAIProvider()">🔀 AI Engine: Gemini</button>
     </div>
   </div>
 </div>
@@ -845,6 +847,56 @@
 
 const GEMINI_MODEL = "gemini-3.5-flash";
 var aiChatCache = {};
+  
+function getAIProvider() { return localStorage.getItem('ai_provider') || 'gemini'; }
+
+function toggleAIProvider() {
+  haptic();
+  var next = getAIProvider() === 'gemini' ? 'puter' : 'gemini';
+  localStorage.setItem('ai_provider', next);
+  updateAIProviderLabel();
+  var dd = document.getElementById('menuDropdown');
+  if (dd) dd.classList.remove('show');
+}
+
+function updateAIProviderLabel() {
+  var btn = document.getElementById('aiProviderBtn');
+  if (btn) btn.textContent = '🔀 AI Engine: ' + (getAIProvider() === 'gemini' ? 'Gemini' : 'Puter (Free)');
+}
+updateAIProviderLabel();
+
+function toPuterMessages(contents) {
+  return contents.map(function(c){
+    return { role: c.role === 'model' ? 'assistant' : 'user', content: (c.parts && c.parts[0] && c.parts[0].text) || '' };
+  });
+}
+
+function streamPuter(contents, onChunk, onDone) {
+  var messages = toPuterMessages(contents);
+  var fullText = "";
+  puter.ai.chat(messages, { model: 'z-ai/glm-4.7-flash', stream: true })
+    .then(function(response) {
+      (async function() {
+        try {
+          for await (var part of response) {
+            var piece = part && part.text;
+            if (piece) { fullText += piece; onChunk(piece); }
+          }
+          if (fullText) onDone(null, fullText);
+          else onDone("AI se jawab nahi mil paaya.", null);
+        } catch (err) {
+          onDone(err && err.message ? err.message : String(err), fullText || null);
+        }
+      })();
+    })
+    .catch(function(err){ onDone(err && err.message ? err.message : String(err), null); });
+}
+
+// ── Router: jo bhi engine selected hai, usi ko call karta hai ──
+function streamAI(contents, onChunk, onDone) {
+  if (getAIProvider() === 'puter') streamPuter(contents, onChunk, onDone);
+  else streamGemini(contents, onChunk, onDone);
+}
 
 function buildInitialPrompt(q) {
   var qText = (q.hindi ? q.hindi + '\n' : '') + (q.text ? q.text + '\n' : '');
@@ -964,7 +1016,7 @@ function askAIFollowup() {
   if (sendBtn) sendBtn.disabled = true;
 
   var live = "";
-  streamGemini(contents, function(chunk){
+  streamAI(contents, function(chunk){
     live += chunk;
     liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>');
     if (msgsEl) msgsEl.scrollTop = msgsEl.scrollHeight;
@@ -981,7 +1033,7 @@ function askAI(btn) {
   var box = document.getElementById('aiSolBox');
   if (!q || !box) return;
 
-  var cacheKey = GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
+  var cacheKey = getAIProvider() + "|" + GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
   window.__aiCacheKey = cacheKey;
 
   if (box.style.display === 'block') { box.style.display = 'none'; return; }
@@ -1004,7 +1056,7 @@ function askAI(btn) {
   var liveMsg = document.getElementById('aiLiveMsg');
   var live = "";
 
-  streamGemini(contents, function(chunk){
+  streamAI(contents, function(chunk){
     live += chunk;
     if (liveMsg) { liveMsg.className = 'ai-msg model'; liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>'); }
   }, function(err, fullText){
