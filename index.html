@@ -853,6 +853,12 @@ function buildInitialPrompt(q) {
   return "Tum ek exam tutor ho. Neeche ek multiple-choice question hai (Math/Reasoning competitive exam). "
     + "Sahi option batao aur short, step-by-step solution Hindi mein samjhao. Bahut lamba mat likho, seedha point par raho. "
     + "Aage bhi student is question ke baare me follow-up sawal pooch sakta hai, unka bhi seedha Hindi me jawab dena.\n\n"
+    + "IMPORTANT FORMATTING RULE: Jab bhi LaTeX math likho ($...$ ya \\(...\\) ya \\frac{}{} ke andar), "
+    + "us math ke andar SIRF numbers, variables (x, y), aur symbols (+, -, \\times, \\div, %, ()) use karo. "
+    + "Devanagari/Hindi shabd (jaise डिस्काउंट, कीमत) KABHI BHI \\text{} ya kisi bhi LaTeX math delimiter ke andar mat likho — "
+    + "isse rendering tut-phut jaati hai. Hindi labels hamesha plain text me, math delimiters ke BAHAR likho. "
+    + "Example (GALAT): \\frac{\\text{डिस्काउंट}}{\\text{कीमत}} \\times 100 "
+    + "Example (SAHI): डिस्काउंट = $\\frac{180}{900} \\times 100$ = 20%\n\n"
     + qText + optsText + ansHint;
 }
 
