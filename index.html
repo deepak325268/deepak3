@@ -1403,6 +1403,19 @@ function renderQuestionPage(content) {
   var clr   = currentClr;
   var idx   = currentQIdx;
   var total = ch.subs.length;
+
+  if (total === 0) {
+    content.innerHTML =
+      '<div class="q-page-view">'
+      +   '<div class="q-page-header">'
+      +     '<button class="q-back-btn" onclick="goBackHome()">‹ BACK</button>'
+      +     '<div class="q-page-title">'+ch.chapter+'</div>'
+      +   '</div>'
+      +   '<div class="imp-empty">🎉 No question for today!</div>'
+      + '</div>';
+    return;
+  }
+
   var sub   = ch.subs[idx];
   var bank  = qBankCache[ch.questionsFile] || [];
   var done  = doneSet.has(currentChKey);
