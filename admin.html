@@ -104,7 +104,7 @@ textarea{resize:vertical;font-family:var(--mono);line-height:1.6}
 /* ═══════════════════════════════════════
    RIGHT PANEL — QUESTIONS EDITOR
 ═══════════════════════════════════════ */
-.rp-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:50;background:var(--bg);padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:16px;transform:translateZ(0)}
+.rp-header{display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:0;z-index:50;background:var(--bg);padding:12px 0;border-bottom:1px solid var(--border);margin-bottom:16px}
 .rp-title{font-size:18px;font-weight:700;flex:1}
 .q-total-badge{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-size:var(--fs-xs);color:var(--accent);font-weight:600}
 
@@ -565,7 +565,7 @@ function getToken() { return localStorage.getItem('session_token') || ''; }
     position:sticky;
     top:0;
     z-index:45;
-    transform:translateZ(0);
+    box-shadow:0 4px 12px rgba(0,0,0,.15);
   ">
         <span id="preview-count-label" style="flex:1;font-size:14px;font-weight:600;color:var(--success)"></span>
         <button class="btn btn-success" onclick="confirmAndAdd()">✅ Confirm & Add to Editor</button>
