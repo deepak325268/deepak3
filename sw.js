@@ -4,7 +4,7 @@
 
 // 1) MANUAL VERSION — jab bhi khud se force-update chahiye,
 //    bas ye number badha dena (1 -> 2 -> 3...)
-var MANUAL_VERSION = 30;
+var MANUAL_VERSION = 31;
 
 // 2) AUTO VERSION — mahina badalte hi khud-ba-khud badal jata hai
 var now = new Date();
@@ -64,7 +64,9 @@ self.addEventListener('fetch', function (event) {
   if (
     url.indexOf('firebasedatabase.app') !== -1 ||
     url.indexOf('workers.dev') !== -1 ||
-    url.indexOf('questions/') !== -1
+    url.indexOf('questions/') !== -1 ||
+    url.indexOf('coverage-check') !== -1 ||
+    url.indexOf('docs.google.com') !== -1
   ) {
     event.respondWith(fetch(event.request));
     return;
