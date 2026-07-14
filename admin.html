@@ -565,7 +565,7 @@ function getToken() { return localStorage.getItem('session_token') || ''; }
     position:sticky;
     top:0;
     z-index:45;
-    box-shadow:0 4px 12px rgba(0,0,0,.15);
+    will-change:transform;
   ">
         <span id="preview-count-label" style="flex:1;font-size:14px;font-weight:600;color:var(--success)"></span>
         <button class="btn btn-success" onclick="confirmAndAdd()">✅ Confirm & Add to Editor</button>
