@@ -984,43 +984,18 @@ function askAIFollowup() {
 function askAI(btn) {
   haptic();
   var q = window.__aiQ;
-  var box = document.getElementById('aiSolBox');
-  if (!q || !box) return;
+  if (!q) return;
 
-  var cacheKey = GEMINI_MODEL + "|" + (q.hindi || '') + "|" + (q.text || '');
-  window.__aiCacheKey = cacheKey;
+  var qText = (q.hindi ? q.hindi + '\n' : '') + (q.text ? q.text + '\n' : '');
+  var optsText = (q.opts && q.opts.length) ? ('Options: ' + q.opts.join(' | ')) : '';
+  var ansHint = q.ans ? ("\n(Answer key hint: " + q.ans + ")") : "";
+  var promptText =
+    "Tum ek exam tutor ho. Neeche ek multiple-choice question hai (Math/Reasoning competitive exam). "
+    + "Sahi option batao aur short, step-by-step solution Hindi mein samjhao.\n\n"
+    + qText + optsText + ansHint;
 
-  if (box.style.display === 'block') { box.style.display = 'none'; return; }
-
-  if (aiChatCache[cacheKey]) {
-    box.style.display = 'block';
-    box.className = 'ai-sol-box';
-    renderAIChat(box, aiChatCache[cacheKey]);
-    return;
-  }
-
-  btn.disabled = true;
-  var origLabel = btn.innerHTML;
-  btn.innerHTML = '⏳';
-  box.style.display = 'block';
-  box.className = 'ai-sol-box';
-  box.innerHTML = '<div class="ai-chat-msgs"><div class="ai-msg model ai-typing" id="aiLiveMsg">●&nbsp;●&nbsp;●</div></div>';
-
-  var contents = [{ role: 'user', parts: [{ text: buildInitialPrompt(q) }] }];
-  var liveMsg = document.getElementById('aiLiveMsg');
-  var live = "";
-
-  streamGemini(contents, function(chunk){
-    live += chunk;
-    if (liveMsg) { liveMsg.className = 'ai-msg model'; liveMsg.innerHTML = escH(live).replace(/\n/g,'<br>'); }
-  }, function(err, fullText){
-    btn.disabled = false;
-    btn.innerHTML = origLabel;
-    if (err && !fullText) { box.innerHTML = '⚠️ ' + escH(err); return; }
-    contents.push({ role: 'model', parts: [{ text: fullText }] });
-    aiChatCache[cacheKey] = contents;
-    renderAIChat(box, contents);
-  });
+  var url = "https://chatgpt.com/?q=" + encodeURIComponent(promptText);
+  window.open(url, 'chatgptPopup', 'width=420,height=650,resizable=yes,scrollbars=yes');
 }
 
   
