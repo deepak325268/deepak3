@@ -1014,7 +1014,7 @@ function applyCustomOrder(chapters, order) {
     var idx = remaining.findIndex(function(c){ return c.chapter === name; });
     if (idx !== -1) { ordered.push(remaining[idx]); remaining.splice(idx, 1); }
   });
-  return ordered.concat(remaining); // naye chapters jo order me nahi hain, end me aayenge
+  return ordered.concat(remaining); // naye chapters jo order me nahi hain, end me aayenga
 }
 function fetchChapterOrder(subject) {
   return fetch(FIREBASE_URL + "/chapterOrder/" + subject + ".json")
