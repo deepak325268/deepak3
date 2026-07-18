@@ -1732,6 +1732,7 @@ fetch(API_MATH)
   });
 
   function checkAns(el, ans, idx) {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   var box = el.parentElement;
   if (box.classList.contains('answered')) return;
   box.classList.add('answered');
