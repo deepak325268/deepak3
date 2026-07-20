@@ -588,6 +588,8 @@ let currentSHA  = '';
 let dirty       = false;   // unsaved changes?
 let savedSnapshot = '[]';  // JSON snapshot of existingQ as last loaded/saved from GitHub — used to detect real changes vs undone edits
 let dragSrcIdx  = null;
+let fileLoadToken = 0;
+let fileLoadInFlight = false;
 let savedSubject = '';     // last known subject value saved on GitHub (meta.json)
 let searchQuery       = '';    // question search/filter text
 let filterMissingOnly = false; // "answer missing" quick-filter active?
@@ -947,9 +949,13 @@ async function doApproveFlag(f) {
 
     let existingImp = [];
     const impR = await ghFetch('contents/questions/important-questions.json');
-    if (impR.ok) {
+    if (impR.status === 404) {
+      existingImp = [];
+    } else if (impR.ok) {
       const id = await impR.json();
       existingImp = JSON.parse(decodeURIComponent(escape(atob(id.content.replace(/\n/g,'')))));
+    } else {
+      return { ok: false, msg: 'important-questions.json fetch fail — dobara try karo (baaki chapters ka data safe hai)' };
     }
     existingImp = existingImp.filter(function(x){ return x._file !== f.file; });
     arr.filter(function(x){ return x.imp; }).forEach(function(x) {
@@ -1122,9 +1128,19 @@ async function forceReloadFromGitHub() {
 
 async function loadExistingFile(filename) {
   if (!getToken()) { toast('Pehle login karo!','warn'); return; }
+
+  const myToken = ++fileLoadToken;
+  fileLoadInFlight = true;
+  existingQ = [];
+  dirty = false;
+  updateSaveBtn();
   document.getElementById('file-info').textContent = '⏳ Loading...';
+  renderEditor();
+
   try {
     const r = await ghFetch(`contents/questions/${filename}`);
+    if (myToken !== fileLoadToken) return;
+
     if (r.status===404) {
       existingQ=[]; currentSHA=''; savedSnapshot='[]'; dirty=false;
       document.getElementById('file-info').textContent = '⚠️ Naya file banega';
@@ -1132,6 +1148,8 @@ async function loadExistingFile(filename) {
     }
     if (!r.ok) { toast('Load error!','error'); return; }
     const data = await r.json();
+    if (myToken !== fileLoadToken) return;
+
     currentSHA = data.sha;
     existingQ = JSON.parse(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));
     savedSnapshot = JSON.stringify(existingQ);
@@ -1140,7 +1158,10 @@ async function loadExistingFile(filename) {
     renderEditor();
     toast(`${existingQ.length} questions load ho gaye!`,'success');
   } catch(e) {
+    if (myToken !== fileLoadToken) return;
     toast('Parse error: '+e.message,'error');
+  } finally {
+    if (myToken === fileLoadToken) { fileLoadInFlight = false; updateSaveBtn(); }
   }
 }
 
@@ -1858,8 +1879,8 @@ function updateSaveBtn() {
     box.style.display = 'none';
   }
 
-  btn.disabled = !dirty || existingQ.length===0 || !fn;
-  info.textContent = dirty ? `⚠️ ${existingQ.length} questions — unsaved changes` : '';
+  btn.disabled = !dirty || existingQ.length===0 || !fn || fileLoadInFlight;
+  info.textContent = fileLoadInFlight ? '⏳ Chapter load ho raha hai...' : (dirty ? `⚠️ ${existingQ.length} questions — unsaved changes` : '');
 }
 
 async function saveToGitHub() {
@@ -1867,6 +1888,11 @@ async function saveToGitHub() {
   if (!filename) { toast('File naam select karo!','error'); return; }
   if (existingQ.length===0) { toast('Questions hain hi nahi!','error'); return; }
   if (!getToken()) { toast('Pehle login karo!','error'); return; }
+  if (fileLoadInFlight) { toast('⏳ Chapter abhi load ho raha hai — 1 sec ruk ke phir Save karo!','warn'); return; }
+  if (currentFile && filename !== currentFile) {
+    toast(`⚠️ Mismatch: screen "${currentFile}" dikha raha hai par save "${filename}" me ho raha hai — cancel kiya, dobara try karo.`,'error',8000);
+    return;
+  }
 
   const toSave = existingQ.map(q=>{ const {_new,...rest}=q; return rest; });
   const content = btoa(unescape(encodeURIComponent(JSON.stringify(toSave, null, 2))));
@@ -1952,12 +1978,20 @@ async function saveImportantJson(filename) {
     let existing = [];
     try {
       const r = await ghFetch(`contents/questions/important-questions.json`);
-      if (r.ok) {
+      if (r.status === 404) {
+        existing = [];
+      } else if (r.ok) {
         const d = await r.json();
         impSHA = d.sha;
         existing = JSON.parse(decodeURIComponent(escape(atob(d.content.replace(/\n/g,'')))));
+      } else {
+        toast('⚠️ important-questions.json load fail — is chapter ka important-list update SKIP kiya (baaki data safe hai). Dobara "Save" karo.', 'error', 8000);
+        return;
       }
-    } catch(e) {}
+    } catch(e) {
+      toast('⚠️ important-questions.json load error — is chapter ka important-list update SKIP kiya (baaki data safe hai). Dobara "Save" karo.', 'error', 8000);
+      return;
+    }
 
     existing = existing.filter(q => q._file !== filename);
 
@@ -1970,14 +2004,21 @@ async function saveImportantJson(filename) {
     const body = {message:`Update important-questions.json — ${filename}`, content, branch:'main'};
     if (impSHA) body.sha = impSHA;
 
-    await ghFetch(`contents/questions/important-questions.json`, {
+    const impSaveR = await ghFetch(`contents/questions/important-questions.json`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    toast(`⭐ ${newImp.length} important questions updated!`, 'info');
+    if (impSaveR.ok) {
+      toast(`⭐ ${newImp.length} important questions updated!`, 'info');
+    } else {
+      let errMsg = 'unknown error';
+      try { const errData = await impSaveR.json(); errMsg = errData.message || errMsg; } catch(e2) {}
+      toast('❌ important-questions.json save fail: '+errMsg, 'error', 8000);
+    }
   } catch(e) {
     console.warn('important-questions.json error:', e);
+    toast('⚠️ important-questions.json update error: '+e.message, 'error', 6000);
   }
 }
 
