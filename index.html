@@ -1697,6 +1697,34 @@ document.addEventListener("touchend", function(e){
   }
 }, {passive:true});
 
+
+document.addEventListener("keydown", function(e){
+  var key = e.key;
+  var isNext = (key === "ArrowRight" || key === "ArrowDown" || key === "Enter");
+  var isPrev = (key === "ArrowLeft"  || key === "ArrowUp");
+  if (!isNext && !isPrev) return;
+
+  var ae = document.activeElement, tag = ae ? ae.tagName : '';
+  if (tag === "INPUT" || tag === "TEXTAREA" || (ae && ae.isContentEditable)) return;
+  if (key === "Enter" && tag === "BUTTON") return;
+
+  var onQuestionPage = (activeTab === 'important' && impLoaded && impView === 'questions')
+                     || (activeTab !== 'important' && currentView === 'questions');
+
+  if (onQuestionPage) {
+    e.preventDefault();
+    if (activeTab === 'important') { if (isNext) goImpQ(impQIdx + 1); else goImpQ(impQIdx - 1); }
+    else                            { if (isNext) goToQuestion(currentQIdx + 1); else goToQuestion(currentQIdx - 1); }
+    return;
+  }
+
+  if (key !== "ArrowLeft" && key !== "ArrowRight") return;
+  var idx = TABS.indexOf(activeTab);
+  if (isNext && idx < TABS.length-1) switchTab(TABS[idx+1], "left");
+  else if (isPrev && idx > 0)        switchTab(TABS[idx-1], "right");
+}, false);
+  
+
 var cacheObj = {};
 function saveCache() {
   localStorage.setItem(cacheKey, JSON.stringify(cacheObj));
